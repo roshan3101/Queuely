@@ -234,7 +234,7 @@ Backend support for Phase 14:
 
 - [x] Add unit tests for prompt assembly, task helpers, and file validation
 - [x] Add unit test coverage for request-size limiting middleware
-- [ ] Add integration tests for API plus PostgreSQL plus Redis
+- [x] Add integration tests for API plus PostgreSQL plus Redis
 - [ ] Add worker integration tests for retries and DLQ behavior
 - [ ] Add WebSocket tests for live status updates
 - [ ] Add retrieval tests for message memory and code chunks
