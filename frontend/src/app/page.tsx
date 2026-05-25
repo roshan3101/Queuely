@@ -330,6 +330,8 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsReconnectAttemptRef = useRef(0);
+  const selectedJobIdRef = useRef<string | null>(null);
+  const opsRefreshTimerRef = useRef<number | null>(null);
 
   const fileMap = useMemo(() => Object.fromEntries(files.map((file) => [file.id, file])), [files]);
 
@@ -452,6 +454,10 @@ export default function Home() {
   }, [activeSessionId, apiBase, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    selectedJobIdRef.current = selectedJob?.id ?? null;
+  }, [selectedJob]);
+
+  useEffect(() => {
     if (!token || !isOnline) {
       wsRef.current?.close();
       wsRef.current = null;
@@ -476,9 +482,20 @@ export default function Home() {
 
       socket.onmessage = (event) => {
         try {
-          const payload = JSON.parse(String(event.data)) as { type?: string };
+          const payload = JSON.parse(String(event.data)) as { type?: string; job_id?: string };
           if (payload.type === "job_event") {
-            void loadOps().catch(() => undefined);
+            // Debounce ops refreshes when many events arrive.
+            if (opsRefreshTimerRef.current) {
+              window.clearTimeout(opsRefreshTimerRef.current);
+            }
+            opsRefreshTimerRef.current = window.setTimeout(() => {
+              void loadOps().catch(() => undefined);
+              void loadOpsJobs().catch(() => undefined);
+              const selectedId = selectedJobIdRef.current;
+              if (selectedId && payload.job_id && payload.job_id === selectedId) {
+                void loadJobDetail(selectedId).catch(() => undefined);
+              }
+            }, 250);
           }
         } catch {
           // ignore
