@@ -45,26 +45,26 @@ This document is the execution checklist for the full platform.
 
 ## Phase 3: Job Domain Model
 
-- [ ] Finalize supported job types and payload contracts
-- [ ] Create Pydantic request and response schemas for jobs
-- [ ] Define idempotency behavior for repeated submissions
-- [ ] Define job priority behavior
-- [ ] Define cancellation semantics
-- [ ] Define result payload normalization across job types
-- [ ] Define operator-facing event taxonomy for `job_events`
+- [x] Finalize supported job types and payload contracts
+- [x] Create Pydantic request and response schemas for jobs
+- [x] Define idempotency behavior for repeated submissions
+- [x] Define job priority behavior
+- [x] Define cancellation semantics
+- [x] Define result payload normalization across job types
+- [x] Define operator-facing event taxonomy for `job_events`
 
 ## Phase 4: Job Submission API
 
-- [ ] Build `POST /jobs` endpoint
-- [ ] Validate authenticated user and payload
+- [x] Build `POST /jobs` endpoint
+- [x] Validate authenticated user and payload
 - [ ] Enforce per-user rate limit before enqueueing
-- [ ] Persist job row before dispatch
-- [ ] Publish task to the correct Celery queue
-- [ ] Return stable job id and initial status
-- [ ] Build `GET /jobs/{job_id}` endpoint
-- [ ] Build `GET /jobs` listing endpoint with filtering and pagination
-- [ ] Build `POST /jobs/{job_id}/cancel` endpoint
-- [ ] Build idempotent submission handling using `idempotency_key`
+- [x] Persist job row before dispatch
+- [x] Publish task to the correct Celery queue
+- [x] Return stable job id and initial status
+- [x] Build `GET /jobs/{job_id}` endpoint
+- [x] Build `GET /jobs` listing endpoint with filtering and pagination
+- [x] Build `POST /jobs/{job_id}/cancel` endpoint
+- [x] Build idempotent submission handling using `idempotency_key`
 
 ## Phase 5: Queueing and Worker Execution
 

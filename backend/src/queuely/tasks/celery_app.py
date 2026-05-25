@@ -17,6 +17,7 @@ celery_app.conf.update(
         "queuely.tasks.jobs.process_pdf": {"queue": "jobs.pdf"},
         "queuely.tasks.jobs.generate_report": {"queue": "jobs.report"},
         "queuely.tasks.jobs.send_email": {"queue": "jobs.email"},
+        "queuely.tasks.jobs.process_custom": {"queue": "jobs.default"},
     },
     task_track_started=True,
     task_acks_late=True,

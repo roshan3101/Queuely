@@ -22,3 +22,9 @@ def generate_report(self, job_id: str) -> dict[str, str]:
 def send_email(self, job_id: str) -> dict[str, str]:
     logger.info("Placeholder email task for job %s", job_id)
     return {"job_id": job_id, "status": "placeholder"}
+
+
+@celery_app.task(bind=True, name="queuely.tasks.jobs.process_custom")
+def process_custom(self, job_id: str) -> dict[str, str]:
+    logger.info("Placeholder custom task for job %s", job_id)
+    return {"job_id": job_id, "status": "placeholder"}
