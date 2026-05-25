@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     rate_limit_capacity: int = Field(default=60, alias="RATE_LIMIT_CAPACITY")
     rate_limit_refill_rate: float = Field(default=1.0, alias="RATE_LIMIT_REFILL_RATE")
     websocket_ping_interval: int = Field(default=30, alias="WEBSOCKET_PING_INTERVAL")
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    openai_embedding_model: str = Field(default="text-embedding-ada-002", alias="OPENAI_EMBEDDING_MODEL")
+    prompt_max_input_tokens: int = Field(default=6000, alias="PROMPT_MAX_INPUT_TOKENS")
+    prompt_recent_messages_limit: int = Field(default=20, alias="PROMPT_RECENT_MESSAGES_LIMIT")
+    retrieval_top_k: int = Field(default=5, alias="RETRIEVAL_TOP_K")
 
     @property
     def redis_url(self) -> str:

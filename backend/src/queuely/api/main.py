@@ -7,8 +7,10 @@ from redis.asyncio import Redis
 
 from queuely.api.routes.auth import router as auth_router
 from queuely.api.errors import register_exception_handlers
+from queuely.api.routes.files import router as files_router
 from queuely.api.routes.jobs import router as jobs_router
 from queuely.api.routes.ops import router as ops_router
+from queuely.api.routes.sessions import router as sessions_router
 from queuely.api.routes.system import router as system_router
 from queuely.api.routes.ws import router as ws_router
 from queuely.core.config import get_settings
@@ -55,8 +57,10 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestContextMiddleware)
     register_exception_handlers(app)
     app.include_router(auth_router)
+    app.include_router(files_router)
     app.include_router(jobs_router)
     app.include_router(ops_router)
+    app.include_router(sessions_router)
     app.include_router(system_router)
     app.include_router(ws_router)
 
