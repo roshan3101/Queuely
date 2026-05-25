@@ -235,38 +235,15 @@ Backend support for Phase 14:
 - [x] Add unit tests for prompt assembly, task helpers, and file validation
 - [x] Add unit test coverage for request-size limiting middleware
 - [x] Add integration tests for API plus PostgreSQL plus Redis
-- [ ] Add worker integration tests for retries and DLQ behavior
-- [ ] Add WebSocket tests for live status updates
-- [ ] Add retrieval tests for message memory and code chunks
-- [ ] Add frontend component tests for sessions, streaming, and uploads
-- [ ] Add end-to-end tests for the core session flow
+- [x] Add worker integration tests for retries and DLQ behavior
+- [x] Add WebSocket tests for live status updates
+- [x] Add retrieval tests for message memory and code chunks
+- [x] Add frontend component tests for sessions, streaming, and uploads
+- [x] Add end-to-end tests for the core session flow
 
-## Phase 18: Security and Production Hardening
+## Deferred Until After Deployment
 
-- [x] Validate uploaded file content and extension handling
-- [x] Add request size limits
-- [x] Add CORS and trusted host config
-- [ ] Add secret management strategy
-- [x] Add audit logging for privileged actions
-- [x] Add abuse controls for AI and upload endpoints
-- [ ] Add worker isolation guidance for untrusted workloads
-
-## Phase 19: Observability
-
-- [ ] Add metrics for queue depth, task latency, retry counts, DLQ counts, and worker health
-- [ ] Add tracing or request correlation across API and workers
-- [x] Add prompt assembly diagnostics
-- [ ] Add retrieval diagnostics for memory and code context
-- [ ] Add dashboard/admin surfaces for operational debugging
-
-## Phase 20: Documentation and Runbooks
-
-- [x] Document local development workflow
-- [x] Document migration workflow
-- [ ] Document package installation workflow
-- [ ] Document job lifecycle and queue routing
-- [ ] Document AI memory and code-context pipeline
-- [ ] Document failure modes and operator runbooks
+Phases 18 (security hardening), 19 (observability), and 20 (runbooks) are intentionally deferred until after the initial deployment milestone.
 
 ## Notes and Open Decisions
 
