@@ -1,4 +1,5 @@
 COMPOSE_FILE=infra/docker-compose.yml
+COMPOSE_TEST_FILE=infra/docker-compose.test.yml
 
 .PHONY: dev down logs migrate test lint frontend-build
 
@@ -16,6 +17,9 @@ migrate:
 
 test:
 	cd backend && pytest
+
+test-docker:
+	docker compose -f $(COMPOSE_TEST_FILE) up --build --abort-on-container-exit --exit-code-from test
 
 lint:
 	cd backend && ruff check src
