@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     prompt_max_input_tokens: int = Field(default=6000, alias="PROMPT_MAX_INPUT_TOKENS")
     prompt_recent_messages_limit: int = Field(default=20, alias="PROMPT_RECENT_MESSAGES_LIMIT")
     retrieval_top_k: int = Field(default=5, alias="RETRIEVAL_TOP_K")
+    cors_origins_raw: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+    trusted_hosts_raw: str = Field(default="localhost,127.0.0.1", alias="TRUSTED_HOSTS")
+    max_upload_size_bytes: int = Field(default=5 * 1024 * 1024, alias="MAX_UPLOAD_SIZE_BYTES")
 
     @property
     def redis_url(self) -> str:
@@ -43,6 +46,14 @@ class Settings(BaseSettings):
         if self.redis_password:
             auth_part = f":{self.redis_password}@"
         return f"redis://{auth_part}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
+
+    @property
+    def trusted_hosts(self) -> list[str]:
+        return [host.strip() for host in self.trusted_hosts_raw.split(",") if host.strip()]
 
 
 @lru_cache

@@ -52,3 +52,20 @@ class FileUploadResponse(BaseModel):
     original_name: str
     size_bytes: int
 
+
+class FileRead(BaseModel):
+    id: str
+    session_id: str | None
+    original_name: str
+    language: str | None
+    status: str
+    size_bytes: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class FileListRead(BaseModel):
+    items: list[FileRead]
+    total: int
+    limit: int
+    offset: int

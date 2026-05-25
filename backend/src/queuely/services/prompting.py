@@ -27,6 +27,14 @@ def estimate_tokens(model: str, text: str) -> int:
     return len(_encoder(model).encode(text))
 
 
+def truncate_to_tokens(model: str, text: str, token_limit: int) -> str:
+    encoder = _encoder(model)
+    token_ids = encoder.encode(text)
+    if len(token_ids) <= token_limit:
+        return text
+    return encoder.decode(token_ids[:token_limit])
+
+
 def clamp_prompt(
     *,
     model: str,
@@ -37,18 +45,25 @@ def clamp_prompt(
     max_input_tokens: int | None = None,
 ) -> list[dict[str, str]]:
     limit = max_input_tokens if max_input_tokens is not None else settings.prompt_max_input_tokens
-    pieces: list[PromptPiece] = [PromptPiece(role="system", content=system_prompt.strip())]
+    system_piece = PromptPiece(role="system", content=system_prompt.strip())
+    memory_piece = None
+    chunk_piece = None
+    recent_pieces = list(recent_messages)
 
     if retrieved_memory:
         memory_block = "Relevant past exchanges:\n" + "\n\n".join(retrieved_memory)
-        pieces.append(PromptPiece(role="system", content=memory_block))
+        memory_piece = PromptPiece(role="system", content=memory_block)
 
     if retrieved_chunks:
         chunk_block = "Relevant code/context snippets:\n" + "\n\n".join(retrieved_chunks)
-        pieces.append(PromptPiece(role="system", content=chunk_block))
+        chunk_piece = PromptPiece(role="system", content=chunk_block)
 
-    # Add recent messages last (most important).
-    pieces.extend(recent_messages)
+    pieces: list[PromptPiece] = [system_piece]
+    if memory_piece:
+        pieces.append(memory_piece)
+    if chunk_piece:
+        pieces.append(chunk_piece)
+    pieces.extend(recent_pieces)
 
     # Drop oldest non-system messages until within limit.
     def tokens_for(p: PromptPiece) -> int:
@@ -58,13 +73,33 @@ def clamp_prompt(
     if total <= limit:
         return [{"role": p.role, "content": p.content} for p in pieces]
 
-    # Remove from the start of recent_messages section first.
-    i = 0
-    base = pieces[: 1 + (1 if retrieved_memory else 0) + (1 if retrieved_chunks else 0)]
-    tail = pieces[len(base) :]
-    while total > limit and i < len(tail):
-        total -= tokens_for(tail[i])
-        i += 1
-    pruned = base + tail[i:]
-    return [{"role": p.role, "content": p.content} for p in pruned]
+    while total > limit and recent_pieces:
+        removed = recent_pieces.pop(0)
+        total -= tokens_for(removed)
 
+    pieces = [system_piece]
+    if memory_piece:
+        pieces.append(memory_piece)
+    if chunk_piece:
+        pieces.append(chunk_piece)
+    pieces.extend(recent_pieces)
+    total = sum(tokens_for(p) for p in pieces)
+
+    if total > limit and chunk_piece is not None:
+        pieces = [system_piece]
+        if memory_piece:
+            pieces.append(memory_piece)
+        pieces.extend(recent_pieces)
+        total = sum(tokens_for(p) for p in pieces)
+
+    if total > limit and memory_piece is not None:
+        pieces = [system_piece]
+        pieces.extend(recent_pieces)
+        total = sum(tokens_for(p) for p in pieces)
+
+    if total > limit:
+        available_for_system = max(1, limit - 4)
+        truncated_system = truncate_to_tokens(model, system_piece.content, available_for_system)
+        return [{"role": "system", "content": truncated_system}]
+
+    return [{"role": p.role, "content": p.content} for p in pieces]

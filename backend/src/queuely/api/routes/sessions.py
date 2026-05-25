@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 from queuely.api.auth import require_active_user
 from queuely.api.dependencies import get_db_session, get_request_id
 from queuely.core.config import get_settings
+from queuely.core.exceptions import QueuelyError
 from queuely.core.responses import ApiResponse
+from queuely.db.session import SessionLocal
 from queuely.models.context import ConversationMessage, DebugSession, MessageRole, ResponseReference, ResponseSourceType
 from queuely.models.user import User
 from queuely.schemas.context import (
@@ -132,7 +134,7 @@ def _compose_prompt(
     current_user: User,
     session_row: DebugSession,
     user_message: str,
-) -> tuple[list[dict[str, str]], list[tuple[str, str]]]:
+) -> tuple[list[dict[str, str]], list[tuple[str, object]], list[tuple[str, object]]]:
     query_embedding = embed_text(user_message)
 
     mem = retrieve_similar_messages(db, user_id=current_user.id, query_embedding=query_embedding, top_k=settings.retrieval_top_k)
@@ -162,12 +164,7 @@ def _compose_prompt(
         max_input_tokens=settings.prompt_max_input_tokens,
     )
 
-    sources: list[tuple[str, str]] = []
-    for m, dist in mem:
-        sources.append((m.id, f"{dist:.6f}"))
-    for c, dist in chunks:
-        sources.append((c.id, f"{dist:.6f}"))
-    return messages, sources
+    return messages, mem, chunks
 
 
 @router.post("/{session_id}/messages", response_model=ApiResponse[MessageRead])
@@ -180,7 +177,7 @@ def create_message(
 ) -> ApiResponse[MessageRead]:
     session_row = db.get(DebugSession, session_id)
     if not session_row or session_row.user_id != current_user.id:
-        return ApiResponse(data=None, request_id=request_id)  # type: ignore[arg-type]
+        raise QueuelyError("session_not_found", "Session not found.", status_code=404)
 
     user_seq = _next_sequence_number(db, session_row.id)
     user_embedding = embed_text(payload.content)
@@ -196,7 +193,7 @@ def create_message(
     db.add(user_msg)
     db.flush()
 
-    prompt, _sources = _compose_prompt(db, current_user=current_user, session_row=session_row, user_message=payload.content)
+    prompt, mem, chunks = _compose_prompt(db, current_user=current_user, session_row=session_row, user_message=payload.content)
     assistant_text = complete(prompt)
 
     assistant_seq = user_seq + 1
@@ -216,9 +213,6 @@ def create_message(
     db.flush()
 
     # Persist provenance (best-effort; rank by retrieval order).
-    query_embedding = user_embedding
-    mem = retrieve_similar_messages(db, user_id=current_user.id, query_embedding=query_embedding, top_k=settings.retrieval_top_k)
-    chunks = retrieve_similar_file_chunks(db, user_id=current_user.id, query_embedding=query_embedding, top_k=settings.retrieval_top_k)
     rank = 1
     for m, dist in mem:
         db.add(
@@ -260,7 +254,7 @@ def stream_message(
 ) -> StreamingResponse:
     session_row = db.get(DebugSession, session_id)
     if not session_row or session_row.user_id != current_user.id:
-        return StreamingResponse(iter(()), media_type="text/event-stream")
+        raise QueuelyError("session_not_found", "Session not found.", status_code=404)
 
     user_seq = _next_sequence_number(db, session_row.id)
     user_embedding = embed_text(payload.content)
@@ -275,7 +269,7 @@ def stream_message(
     db.add(user_msg)
     db.flush()
 
-    prompt, _sources = _compose_prompt(db, current_user=current_user, session_row=session_row, user_message=payload.content)
+    prompt, mem, chunks = _compose_prompt(db, current_user=current_user, session_row=session_row, user_message=payload.content)
     assistant_seq = user_seq + 1
     assistant_msg = ConversationMessage(
         session_id=session_row.id,
@@ -287,7 +281,7 @@ def stream_message(
     )
     db.add(assistant_msg)
     session_row.last_message_at = datetime.now(UTC)
-    db.flush()
+    db.commit()
 
     assistant_id = assistant_msg.id
 
@@ -299,11 +293,39 @@ def stream_message(
             full.append(delta)
             yield f"event: delta\ndata: {delta}\n\n".encode("utf-8")
         text = "".join(full)
-        # Persist final content and embedding once.
-        assistant_msg.content = text
-        assistant_msg.embedding = embed_text(text) if text else None
-        db.commit()
+        # Persist final content, embeddings, and provenance once.
+        with SessionLocal() as write_session:
+            assistant = write_session.get(ConversationMessage, assistant_id)
+            if assistant is not None:
+                assistant.content = text
+                assistant.embedding = embed_text(text) if text else None
+                rank = 1
+                for message, dist in mem:
+                    write_session.add(
+                        ResponseReference(
+                            assistant_message_id=assistant.id,
+                            source_type=ResponseSourceType.memory_message,
+                            referenced_message_id=message.id,
+                            rank=rank,
+                            similarity_score=float(1.0 - dist),
+                            snippet=message.content[:500],
+                        )
+                    )
+                    rank += 1
+                for chunk, dist in chunks:
+                    write_session.add(
+                        ResponseReference(
+                            assistant_message_id=assistant.id,
+                            source_type=ResponseSourceType.file_chunk,
+                            referenced_file_id=chunk.file_id,
+                            referenced_chunk_id=chunk.id,
+                            rank=rank,
+                            similarity_score=float(1.0 - dist),
+                            snippet=chunk.content[:500],
+                        )
+                    )
+                    rank += 1
+                write_session.commit()
         yield b"event: done\ndata: ok\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream")
-

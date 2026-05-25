@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
-import logging
 import asyncio
+import logging
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from queuely.api.routes.auth import router as auth_router
 from queuely.api.errors import register_exception_handlers
@@ -54,6 +56,16 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
+    if settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    if settings.trusted_hosts:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
     app.add_middleware(RequestContextMiddleware)
     register_exception_handlers(app)
     app.include_router(auth_router)

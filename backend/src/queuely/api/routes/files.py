@@ -4,19 +4,41 @@ import hashlib
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from queuely.api.auth import require_active_user
 from queuely.api.dependencies import get_db_session, get_request_id
+from queuely.core.config import get_settings
+from queuely.core.exceptions import QueuelyError
 from queuely.core.responses import ApiResponse
 from queuely.models.context import DebugSession, FileChunk, UploadedFile, UploadedFileStatus
 from queuely.models.user import User
-from queuely.schemas.context import FileUploadResponse
+from queuely.schemas.context import FileListRead, FileRead, FileUploadResponse
 from queuely.services.ai_embeddings import embed_text
 
 
 router = APIRouter(prefix="/files", tags=["files"])
+settings = get_settings()
+ALLOWED_EXTENSIONS = {
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".json",
+    ".md",
+    ".sql",
+    ".yaml",
+    ".yml",
+    ".txt",
+    ".toml",
+    ".cfg",
+    ".ini",
+    ".css",
+    ".html",
+}
 
 
 def _storage_root() -> Path:
@@ -55,6 +77,49 @@ def _chunk_lines(text: str, *, lines_per_chunk: int = 200) -> list[tuple[int, in
     return chunks
 
 
+def _validate_upload(filename: str, size_bytes: int) -> None:
+    ext = os.path.splitext(filename.lower())[1]
+    if ext not in ALLOWED_EXTENSIONS:
+        raise QueuelyError("unsupported_file_type", f"Unsupported file type: {ext or 'unknown'}.", status_code=400)
+    if size_bytes > settings.max_upload_size_bytes:
+        raise QueuelyError("file_too_large", "Uploaded file exceeds the configured size limit.", status_code=413)
+
+
+def _serialize_file(row: UploadedFile) -> FileRead:
+    return FileRead(
+        id=row.id,
+        session_id=row.session_id,
+        original_name=row.original_name,
+        language=row.language,
+        status=row.status.value if hasattr(row.status, "value") else str(row.status),
+        size_bytes=row.size_bytes,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+@router.get("", response_model=ApiResponse[FileListRead])
+def list_files(
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_active_user),
+    request_id: str | None = Depends(get_request_id),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> ApiResponse[FileListRead]:
+    total = db.scalar(
+        select(func.count()).select_from(UploadedFile).where(UploadedFile.user_id == current_user.id)
+    ) or 0
+    stmt = (
+        select(UploadedFile)
+        .where(UploadedFile.user_id == current_user.id)
+        .order_by(UploadedFile.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = [_serialize_file(row) for row in db.scalars(stmt)]
+    return ApiResponse(data=FileListRead(items=items, total=total, limit=limit, offset=offset), request_id=request_id)
+
+
 @router.post("", response_model=ApiResponse[FileUploadResponse], status_code=status.HTTP_201_CREATED)
 async def upload_file(
     file: UploadFile = File(...),
@@ -69,6 +134,7 @@ async def upload_file(
             session_id = None
 
     data = await file.read()
+    _validate_upload(file.filename or "upload.bin", len(data))
     digest = _sha256(data)
     language = _guess_language(file.filename or "")
 
@@ -117,4 +183,3 @@ async def upload_file(
         data=FileUploadResponse(file_id=row.id, status=row.status.value, original_name=row.original_name, size_bytes=row.size_bytes),
         request_id=request_id,
     )
-
