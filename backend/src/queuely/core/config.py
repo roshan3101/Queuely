@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
     openai_embedding_model: str = Field(default="text-embedding-ada-002", alias="OPENAI_EMBEDDING_MODEL")
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
     prompt_max_input_tokens: int = Field(default=6000, alias="PROMPT_MAX_INPUT_TOKENS")
     prompt_response_headroom_tokens: int = Field(default=1200, alias="PROMPT_RESPONSE_HEADROOM_TOKENS")
     prompt_system_budget_tokens: int = Field(default=900, alias="PROMPT_SYSTEM_BUDGET_TOKENS")
@@ -59,6 +61,14 @@ class Settings(BaseSettings):
     smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
     smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
     smtp_from_email: str | None = Field(default=None, alias="SMTP_FROM_EMAIL")
+    pdf_max_pages: int = Field(default=100, alias="PDF_MAX_PAGES")
+    pdf_max_file_size_bytes: int = Field(default=25 * 1024 * 1024, alias="PDF_MAX_FILE_SIZE_BYTES")
+    pdf_allowed_roots_raw: str = Field(default="backend/storage/uploads,.", alias="PDF_ALLOWED_ROOTS")
+    pdf_enable_ocr: bool = Field(default=True, alias="PDF_ENABLE_OCR")
+    pdf_enable_table_extraction: bool = Field(default=True, alias="PDF_ENABLE_TABLE_EXTRACTION")
+    pdf_ocr_dpi_scale: float = Field(default=2.0, alias="PDF_OCR_DPI_SCALE")
+    pdf_scan_text_threshold: int = Field(default=24, alias="PDF_SCAN_TEXT_THRESHOLD")
+    tesseract_cmd: str | None = Field(default=None, alias="TESSERACT_CMD")
 
     @property
     def redis_url(self) -> str:
@@ -74,6 +84,10 @@ class Settings(BaseSettings):
     @property
     def trusted_hosts(self) -> list[str]:
         return [host.strip() for host in self.trusted_hosts_raw.split(",") if host.strip()]
+
+    @property
+    def pdf_allowed_roots(self) -> list[str]:
+        return [path.strip() for path in self.pdf_allowed_roots_raw.split(",") if path.strip()]
 
 
 @lru_cache
