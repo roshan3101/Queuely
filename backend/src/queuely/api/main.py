@@ -4,6 +4,7 @@ import logging
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
+from queuely.api.routes.auth import router as auth_router
 from queuely.api.errors import register_exception_handlers
 from queuely.api.routes.system import router as system_router
 from queuely.core.config import get_settings
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RequestContextMiddleware)
     register_exception_handlers(app)
+    app.include_router(auth_router)
     app.include_router(system_router)
 
     @app.get("/health", tags=["system"])

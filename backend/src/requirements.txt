@@ -3,6 +3,8 @@ amqp==5.3.1
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
+argon2-cffi==25.1.0
+argon2-cffi-bindings==25.1.0
 billiard==4.2.4
 celery==5.6.3
 certifi==2026.5.20
@@ -15,7 +17,9 @@ click-repl==0.3.0
 colorama==0.4.6
 cryptography==48.0.0
 distro==1.9.0
+dnspython==2.8.0
 ecdsa==0.19.2
+email-validator==2.3.0
 fastapi==0.136.3
 greenlet==3.5.1
 h11==0.16.0
@@ -36,6 +40,7 @@ pluggy==1.6.0
 prompt_toolkit==3.0.52
 psycopg==3.3.4
 psycopg-binary==3.3.4
+pwdlib==0.3.0
 pyasn1==0.6.3
 pycparser==3.0
 pydantic==2.13.4
@@ -49,6 +54,8 @@ python-dotenv==1.2.2
 python-jose==3.5.0
 python-multipart==0.0.29
 PyYAML==6.0.3
+# Editable Git install with no remote (queuely-backend==0.1.0)
+-e c:\users\hp\documents\github\queuely\backend
 redis==6.4.0
 regex==2026.5.9
 requests==2.34.2

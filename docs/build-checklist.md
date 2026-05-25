@@ -33,15 +33,15 @@ This document is the execution checklist for the full platform.
 
 ## Phase 2: Authentication and Users
 
-- [ ] Build user registration flow
-- [ ] Build login flow with JWT access tokens
-- [ ] Build refresh token rotation and revocation
-- [ ] Persist refresh-token sessions in PostgreSQL
-- [ ] Add current-user endpoint
-- [ ] Add logout endpoint
-- [ ] Add auth guards for protected routes
-- [ ] Add password hashing and verification
-- [ ] Add role model for admin/operator visibility
+- [x] Build user registration flow
+- [x] Build login flow with JWT access tokens
+- [x] Build refresh token rotation and revocation
+- [x] Persist refresh-token sessions in PostgreSQL
+- [x] Add current-user endpoint
+- [x] Add logout endpoint
+- [x] Add auth guards for protected routes
+- [x] Add password hashing and verification
+- [x] Add role model for admin/operator visibility
 
 ## Phase 3: Job Domain Model
 
