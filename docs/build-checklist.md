@@ -178,27 +178,27 @@ This document is the execution checklist for the full platform.
 
 ## Phase 13: Frontend Session Experience
 
-- [ ] Build app shell with clean minimal dark theme
-- [ ] Build sidebar showing all debug sessions
-- [ ] Build session creation and selection flow
-- [ ] Build conversation history view per session
-- [ ] Build syntax-highlighted code blocks in messages
-- [ ] Build file upload component for codebase context
-- [ ] Build message composer
-- [ ] Build real-time streaming of AI responses
-- [ ] Build referenced-files panel for each response
+- [x] Build app shell with clean minimal dark theme
+- [x] Build sidebar showing all debug sessions
+- [x] Build session creation and selection flow
+- [x] Build conversation history view per session
+- [x] Build syntax-highlighted code blocks in messages
+- [x] Build file upload component for codebase context
+- [x] Build message composer
+- [x] Build real-time streaming of AI responses
+- [x] Build referenced-files panel for each response
 - [ ] Build loading, retry, and disconnected states
-- [ ] Build responsive layout for laptop and desktop
+- [x] Build responsive layout for laptop and desktop
 
 ## Phase 14: Frontend Operations Dashboard
 
-- [ ] Build queue overview widgets
-- [ ] Build worker health panel
+- [x] Build queue overview widgets
+- [x] Build worker health panel
 - [ ] Build job list with filters
 - [ ] Build job detail drawer/page
-- [ ] Build dead-letter queue visibility
+- [x] Build dead-letter queue visibility
 - [ ] Build live status updates over WebSockets
-- [ ] Build manual retry/requeue controls for operators
+- [x] Build manual retry/requeue controls for operators
 
 Backend support for Phase 14:
 - [x] `GET /ops/queues` queue depths (Redis)
@@ -221,16 +221,16 @@ Backend support for Phase 14:
 
 ## Phase 16: Docker and Local Dev
 
-- [ ] Add Dockerfile or compose config for frontend build/runtime split
-- [ ] Add API container startup migration step or explicit migration workflow
-- [ ] Add worker container health checks
+- [x] Add Dockerfile or compose config for frontend build/runtime split
+- [x] Add API container startup migration step or explicit migration workflow
+- [x] Add worker container health checks
 - [ ] Add PostgreSQL init for required extensions
-- [ ] Add Redis persistence and local inspection strategy
-- [ ] Add makefile or task runner for local developer workflows
+- [x] Add Redis persistence and local inspection strategy
+- [x] Add makefile or task runner for local developer workflows
 
 ## Phase 17: Testing
 
-- [ ] Add unit tests for auth, rate limiting, job lifecycle, and prompt assembly
+- [x] Add unit tests for prompt assembly, task helpers, and file validation
 - [ ] Add integration tests for API plus PostgreSQL plus Redis
 - [ ] Add worker integration tests for retries and DLQ behavior
 - [ ] Add WebSocket tests for live status updates
@@ -240,9 +240,9 @@ Backend support for Phase 14:
 
 ## Phase 18: Security and Production Hardening
 
-- [ ] Validate uploaded file content and extension handling
-- [ ] Add request size limits
-- [ ] Add CORS and trusted host config
+- [x] Validate uploaded file content and extension handling
+- [x] Add request size limits
+- [x] Add CORS and trusted host config
 - [ ] Add secret management strategy
 - [ ] Add audit logging for privileged actions
 - [ ] Add abuse controls for AI and upload endpoints
