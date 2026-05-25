@@ -255,14 +255,14 @@ Backend support for Phase 14:
 
 - [ ] Add metrics for queue depth, task latency, retry counts, DLQ counts, and worker health
 - [ ] Add tracing or request correlation across API and workers
-- [ ] Add prompt assembly diagnostics
+- [x] Add prompt assembly diagnostics
 - [ ] Add retrieval diagnostics for memory and code context
 - [ ] Add dashboard/admin surfaces for operational debugging
 
 ## Phase 20: Documentation and Runbooks
 
-- [ ] Document local development workflow
-- [ ] Document migration workflow
+- [x] Document local development workflow
+- [x] Document migration workflow
 - [ ] Document package installation workflow
 - [ ] Document job lifecycle and queue routing
 - [ ] Document AI memory and code-context pipeline

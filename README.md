@@ -11,7 +11,38 @@ Distributed task processing platform built with FastAPI, Celery, Redis, PostgreS
 
 ## Current Status
 
-This repository currently contains the initial production-oriented project structure and database schema.
+This repository contains a working local stack (API + worker + Redis + Postgres + Next.js dashboard), job processing with retries/DLQ, WebSocket fanout for job events, and an AI debug-session surface with memory + codebase context (pgvector).
+
+## Local Dev (Docker)
+
+Run the full stack:
+
+```powershell
+docker compose -f infra/docker-compose.yml up --build
+```
+
+Open:
+- API: `http://localhost:8000/docs`
+- Frontend: `http://localhost:3000`
+
+Migrations:
+- Docker will run migrations automatically via the `api-migrate` service on startup.
+
+## Tests
+
+Run unit tests (local venv):
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+pytest
+```
+
+Run docker integration tests:
+
+```powershell
+make test-docker
+```
 
 ## Delivery Tracking
 
