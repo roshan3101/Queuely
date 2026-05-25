@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Queuely Frontend (Next.js Dashboard)
 
-## Getting Started
+This is the Queuely dashboard UI. It’s a Next.js app that talks to the FastAPI backend to:
 
-First, run the development server:
+- submit and monitor jobs
+- receive live job events over WebSockets (backend fanout)
+- manage AI debug sessions (chat + streaming)
+- upload files for codebase-context retrieval (RAG)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+For the full system overview, start at the repo root: `README.md` and `docs/PROJECT_GUIDE.md`.
+
+## Run (Recommended)
+
+Run the full stack (API + worker + Redis + Postgres + frontend) from the repo root:
+
+```powershell
+docker compose -f infra/docker-compose.yml up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run Frontend Only (Local)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+From `frontend/`:
 
-## Learn More
+```powershell
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+This requires the API to be running separately.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Environment Variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The frontend uses:
 
-## Deploy on Vercel
+- `NEXT_PUBLIC_API_BASE_URL` (example: `http://localhost:8000`)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+When using Docker Compose, this is provided via the repo’s `.env.example` (see `infra/docker-compose.yml`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Scripts
+
+- `npm run dev` - local dev server
+- `npm run lint` - ESLint
+- `npm run test` - unit tests (Vitest)
+- `npm run test:e2e` - e2e tests (Playwright)
+- `npm run build` / `npm run start` - production build + server
+
+## Testing
+
+Unit tests:
+
+```powershell
+npm run test
+```
+
+End-to-end tests (expects the app to be running):
+
+```powershell
+npm run test:e2e
+```
