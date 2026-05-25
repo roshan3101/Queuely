@@ -16,20 +16,20 @@ This document is the execution checklist for the full platform.
 - [x] Add Docker Compose skeleton for API, worker, Redis, PostgreSQL, and frontend
 - [x] Define initial PostgreSQL schema for users, jobs, job events, refresh tokens, worker heartbeats, and rate-limit buckets
 - [x] Install backend Python dependencies in terminal
-- [ ] Install frontend Node dependencies in terminal
-- [ ] Create and run initial Alembic migration in a real database environment
+- [x] Install frontend Node dependencies in terminal
+- [x] Create and run initial Alembic migration in a real database environment
 - [ ] Enable PostgreSQL extensions required by the platform:
-  - [ ] `pgvector`
+  - [x] `pgvector`
   - [ ] `uuid-ossp` if we decide to use DB-generated UUIDs later
 
 ## Phase 1: Backend Core
 
-- [ ] Establish FastAPI app lifecycle, settings loading, dependency injection, and error handling
-- [ ] Add structured logging and request correlation ids
-- [ ] Add environment-specific config strategy for local, staging, and production
-- [ ] Add database session management and health checks
-- [ ] Add Redis connection management and broker health checks
-- [ ] Add shared response envelope and API error model
+- [x] Establish FastAPI app lifecycle, settings loading, dependency injection, and error handling
+- [x] Add structured logging and request correlation ids
+- [x] Add environment-specific config strategy for local, staging, and production
+- [x] Add database session management and health checks
+- [x] Add Redis connection management and broker health checks
+- [x] Add shared response envelope and API error model
 
 ## Phase 2: Authentication and Users
 
@@ -210,7 +210,7 @@ This document is the execution checklist for the full platform.
   - [x] file chunks
   - [x] response provenance / referenced files
 - [x] Add indexes for semantic retrieval and session history access
-- [ ] Add foreign keys and cascade rules for session cleanup
+- [x] Add foreign keys and cascade rules for session cleanup
 - [x] Add Alembic migration for `pgvector` extension and vector columns
 
 ## Phase 16: Docker and Local Dev

@@ -4,6 +4,7 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
 
 COPY pyproject.toml /app/pyproject.toml
 COPY src /app/src
