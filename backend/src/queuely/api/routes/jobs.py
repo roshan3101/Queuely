@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from queuely.api.auth import require_active_user
 from queuely.api.dependencies import get_db_session, get_request_id
+from queuely.api.rate_limit import rate_limit_job_submission
 from queuely.core.responses import ApiResponse
 from queuely.models.job import JobStatus, JobType
 from queuely.models.user import User
@@ -19,6 +20,7 @@ def create_job(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_active_user),
+    _: None = Depends(rate_limit_job_submission),
     request_id: str | None = Depends(get_request_id),
 ) -> ApiResponse[JobRead]:
     job = submit_job(session=session, user=current_user, payload=payload, idempotency_key=idempotency_key)

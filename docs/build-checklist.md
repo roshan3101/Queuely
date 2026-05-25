@@ -107,12 +107,12 @@ This document is the execution checklist for the full platform.
 
 ## Phase 8: Rate Limiting
 
-- [ ] Implement token bucket algorithm against `rate_limit_buckets`
-- [ ] Refill tokens based on elapsed time
-- [ ] Enforce atomic bucket updates
-- [ ] Add per-route rate-limit configuration
-- [ ] Return standard rate-limit headers
-- [ ] Return clear over-limit errors
+- [x] Implement token bucket algorithm against `rate_limit_buckets`
+- [x] Refill tokens based on elapsed time
+- [x] Enforce atomic bucket updates
+- [x] Add per-route rate-limit configuration
+- [x] Return standard rate-limit headers
+- [x] Return clear over-limit errors
 - [ ] Add admin/operator visibility into rate-limit state if needed
 
 ## Phase 9: Memory Management System
