@@ -91,6 +91,8 @@ def mark_succeeded(session: Session, job: Job, *, result: dict | None) -> None:
 
 def mark_retrying(session: Session, job: Job, *, exc_message: str, countdown: int) -> None:
     job.retry_count += 1
+    # Keep the latest failure visible on the job row even while retrying.
+    job.error_message = exc_message
     set_status(
         session,
         job=job,
