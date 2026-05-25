@@ -29,6 +29,19 @@ services:
       timeout: 5s
       retries: 10
 
+  api-migrate:
+    build:
+      context: ../backend
+    env_file:
+      - ../.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+    volumes:
+      - ../backend/src:/app/src
+      - ../backend/migrations:/app/migrations
+
   api:
     build:
       context: ../backend
@@ -39,6 +52,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      api-migrate:
+        condition: service_completed_successfully
     ports:
       - "${API_PORT:-8000}:8000"
     command: ["uvicorn", "queuely.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

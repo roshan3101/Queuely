@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: queuely
+      POSTGRES_USER: queuely
+      POSTGRES_PASSWORD: queuely
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U queuely -d queuely"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ../backend
+    environment:
+      PROJECT_NAME: Queuely
+      ENVIRONMENT: test
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+psycopg://queuely:queuely@postgres:5432/queuely
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      JWT_SECRET_KEY: test-secret
+      OPENAI_API_KEY: test
+      CORS_ORIGINS: http://localhost:3000
+      TRUSTED_HOSTS: localhost,127.0.0.1
+      MAX_REQUEST_SIZE_BYTES: 2097152
+      MAX_UPLOAD_SIZE_BYTES: 5242880
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "queuely.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  api-migrate:
+    build:
+      context: ../backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://queuely:queuely@postgres:5432/queuely
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      JWT_SECRET_KEY: test-secret
+      OPENAI_API_KEY: test
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+
+  test:
+    build:
+      context: ../backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://queuely:queuely@postgres:5432/queuely
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      JWT_SECRET_KEY: test-secret
+      OPENAI_API_KEY: test
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      QUEUELY_TEST_DISABLE_OPENAI: "1"
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+    command: ["pytest", "-q"]
