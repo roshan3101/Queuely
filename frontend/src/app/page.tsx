@@ -547,15 +547,7 @@ export default function Home() {
       });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [activeSessionId, apiBase, token]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!token || !activeSessionId) return;
-    void loadMessages(activeSessionId).catch((error) => {
-      setApiError(error instanceof Error ? error.message : "Failed to load messages.");
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messageLimit]);
+  }, [activeSessionId, apiBase, token, messageLimit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     selectedJobIdRef.current = selectedJob?.id ?? null;
@@ -650,14 +642,25 @@ export default function Home() {
   useEffect(() => {
     if (rateLimitCountdown === null) return;
     const start = Date.now();
-    let remaining = rateLimitCountdown;
-    setRateLimitCountdown(remaining);
-    const id = setInterval(() => {
-      remaining = Math.max(0, rateLimitCountdown - Math.floor((Date.now() - start) / 1000));
+    const initial = rateLimitCountdown;
+
+    const tick = () => {
+      const remaining = Math.max(0, initial - Math.floor((Date.now() - start) / 1000));
       setRateLimitCountdown(remaining);
+      return remaining;
+    };
+
+    const kickoff = window.setTimeout(() => {
+      tick();
+    }, 0);
+    const id = setInterval(() => {
+      const remaining = tick();
       if (remaining <= 0) clearInterval(id);
     }, 1000);
-    return () => clearInterval(id);
+    return () => {
+      window.clearTimeout(kickoff);
+      clearInterval(id);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rateLimitInfo?.reset]);
 
