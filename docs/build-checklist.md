@@ -79,11 +79,11 @@ This document is the execution checklist for the full platform.
 - [x] Implement job state transitions from `pending` to terminal states
 - [x] Implement worker heartbeat updates in PostgreSQL
 - [ ] Implement placeholder execution pipelines for:
-  - [ ] PDF processing
-  - [ ] Report generation
-  - [ ] Email sending
-- [ ] Persist task results to PostgreSQL
-- [ ] Persist task failure details to PostgreSQL
+  - [x] PDF processing (placeholder)
+  - [x] Report generation (placeholder)
+  - [x] Email sending (placeholder)
+- [x] Persist task results to PostgreSQL
+- [x] Persist task failure details to PostgreSQL (job.error_message updated; events emitted)
 
 ## Phase 6: Retries and Dead Letter Queue
 
@@ -117,16 +117,16 @@ This document is the execution checklist for the full platform.
 
 ## Phase 9: Memory Management System
 
-- [ ] Extend PostgreSQL with `pgvector`
-- [ ] Create memory tables for conversations and messages
-- [ ] Create vector column for message embeddings
-- [ ] Store every message in PostgreSQL
-- [ ] Generate embedding for every stored message
-- [ ] Store message role, session id, timestamps, and metadata
-- [ ] On each new message, retrieve top 5 semantically similar past exchanges
+- [x] Extend PostgreSQL with `pgvector`
+- [x] Create memory tables for conversations and messages
+- [x] Create vector column for message embeddings
+- [x] Store every message in PostgreSQL
+- [x] Generate embedding for every stored message
+- [x] Store message role, session id, timestamps, and metadata
+- [x] On each new message, retrieve top 5 semantically similar past exchanges
 - [ ] Define similarity search query and score thresholds
 - [ ] Add recency-aware ranking so stale matches do not dominate
-- [ ] Inject retrieved memory context into the system prompt builder
+- [x] Inject retrieved memory context into the system prompt builder
 - [ ] Prevent duplicate or low-value retrievals
 - [ ] Add retention and pruning rules for long-lived sessions
 
@@ -138,42 +138,42 @@ This document is the execution checklist for the full platform.
   - [ ] codebase context
   - [ ] conversation history
   - [ ] model response headroom
-- [ ] Implement token counting service
-- [ ] Implement prompt assembly pipeline
-- [ ] Truncate low-priority context when near token limit
+- [x] Implement token counting service
+- [x] Implement prompt assembly pipeline
+- [x] Truncate low-priority context when near token limit
 - [ ] Prefer summaries over raw history when needed
-- [ ] Add safeguards so prompt construction never exceeds model limits
+- [x] Add safeguards so prompt construction never exceeds model limits
 - [ ] Log context composition for debugging
 
 ## Phase 11: Codebase Context / File RAG
 
-- [ ] Build file upload API for source files
+- [x] Build file upload API for source files
 - [ ] Validate file types, size limits, and malware-safe handling
-- [ ] Store uploaded file metadata in PostgreSQL
-- [ ] Persist original files in controlled storage
-- [ ] Chunk uploaded files by language-aware strategy
-- [ ] Generate embeddings for chunks using `text-embedding-ada-002` as requested
-- [ ] Store chunk vectors in `pgvector`
-- [ ] Retrieve relevant chunks for each query
-- [ ] Inject retrieved chunks into prompt context
-- [ ] Track which files and chunk ids were used in each response
-- [ ] Return referenced files in API responses for frontend display
+- [x] Store uploaded file metadata in PostgreSQL
+- [x] Persist original files in controlled storage (local disk for dev)
+- [x] Chunk uploaded files (line-based; language stored when detectable)
+- [x] Generate embeddings for chunks using `text-embedding-ada-002` as requested
+- [x] Store chunk vectors in `pgvector`
+- [x] Retrieve relevant chunks for each query
+- [x] Inject retrieved chunks into prompt context
+- [x] Track which files and chunk ids were used in each response
+- [x] Return referenced files in API responses for frontend display
 - [ ] Add re-index flow when a file is replaced
 - [ ] Add deletion flow for uploaded files and derived chunks
 
 ## Phase 12: AI Conversation Orchestration
 
-- [ ] Define debug session domain model
-- [ ] Define conversation turn domain model
-- [ ] Build message submission endpoint for AI sessions
-- [ ] Build streaming response endpoint
-- [ ] Build prompt composer that merges:
-  - [ ] system instructions
-  - [ ] recent chat history
-  - [ ] retrieved memory
-  - [ ] retrieved code chunks
-- [ ] Persist assistant responses incrementally or on completion
-- [ ] Persist retrieval provenance per response
+- [x] Define debug session domain model
+- [x] Define conversation turn domain model
+- [x] Build message submission endpoint for AI sessions
+- [x] Build streaming response endpoint
+- [x] Build prompt composer that merges:
+  - [x] system instructions
+  - [x] recent chat history
+  - [x] retrieved memory
+  - [x] retrieved code chunks
+- [x] Persist assistant responses incrementally or on completion (completion today; incremental pending)
+- [x] Persist retrieval provenance per response
 - [ ] Support cancellation of in-flight AI generation
 
 ## Phase 13: Frontend Session Experience
