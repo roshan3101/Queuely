@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from queuely.models.job import Job, JobEvent, JobStatus
+from queuely.services.pubsub import publish_job_event
 
 
 def get_job(session: Session, job_id: str) -> Job | None:
@@ -22,16 +23,25 @@ def add_event(
     message: str | None,
     metadata: dict | None = None,
 ) -> None:
-    session.add(
-        JobEvent(
-            job_id=job_id,
-            event_type=event_type,
-            status=status,
-            message=message,
-            meta=metadata or {},
-            created_at=datetime.now(UTC),
-        )
+    event = JobEvent(
+        job_id=job_id,
+        event_type=event_type,
+        status=status,
+        message=message,
+        meta=metadata or {},
+        created_at=datetime.now(UTC),
     )
+    session.add(event)
+    job = session.get(Job, job_id)
+    if job is not None:
+        publish_job_event(
+            job_id=job_id,
+            user_id=job.user_id,
+            event_type=event_type,
+            status=status.value if status else None,
+            created_at=event.created_at,
+            payload={"message": message, "metadata": metadata or {}},
+        )
 
 
 def set_status(
