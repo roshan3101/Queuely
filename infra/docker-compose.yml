@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-queuely}
+      POSTGRES_USER: ${POSTGRES_USER:-queuely}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-queuely}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  api:
+    build:
+      context: ../backend
+    env_file:
+      - ../.env.example
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "${API_PORT:-8000}:8000"
+    command: ["uvicorn", "queuely.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ../backend/src:/app/src
+      - ../backend/migrations:/app/migrations
+
+  worker:
+    build:
+      context: ../backend
+    env_file:
+      - ../.env.example
+    depends_on:
+      - postgres
+      - redis
+    command: ["celery", "-A", "queuely.tasks.celery_app:celery_app", "worker", "--loglevel=info"]
+    volumes:
+      - ../backend/src:/app/src
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    env_file:
+      - ../.env.example
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    command: ["sh", "-c", "npm install && npm run dev -- --hostname 0.0.0.0 --port 3000"]
+    volumes:
+      - ../frontend:/app
+
+volumes:
+  postgres_data:
+  redis_data:
