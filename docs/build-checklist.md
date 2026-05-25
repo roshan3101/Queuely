@@ -57,7 +57,7 @@ This document is the execution checklist for the full platform.
 
 - [x] Build `POST /jobs` endpoint
 - [x] Validate authenticated user and payload
-- [ ] Enforce per-user rate limit before enqueueing
+- [x] Enforce per-user rate limit before enqueueing
 - [x] Persist job row before dispatch
 - [x] Publish task to the correct Celery queue
 - [x] Return stable job id and initial status
@@ -92,15 +92,15 @@ This document is the execution checklist for the full platform.
 - [x] Persist retry counts and retry events
 - [x] Route exhausted jobs to `jobs.dlq`
 - [x] Mark dead-lettered jobs in PostgreSQL
-- [ ] Expose dead-lettered jobs in operator APIs
-- [ ] Add replay/requeue capability for dead-lettered jobs
+- [x] Expose dead-lettered jobs in operator APIs
+- [x] Add replay/requeue capability for dead-lettered jobs
 
 ## Phase 7: Real-Time Status Transport
 
-- [ ] Build WebSocket authentication flow
-- [ ] Build session manager for active WebSocket clients
-- [ ] Publish job state changes to subscribers
-- [ ] Bridge worker state updates into WebSocket broadcasts
+- [x] Build WebSocket authentication flow
+- [x] Build session manager for active WebSocket clients
+- [x] Publish job state changes to subscribers
+- [x] Bridge worker state updates into WebSocket broadcasts
 - [ ] Support streaming updates for job progress and final results
 - [ ] Add heartbeat/ping handling for WebSocket clients
 - [ ] Add reconnect-safe client semantics
@@ -199,6 +199,12 @@ This document is the execution checklist for the full platform.
 - [ ] Build dead-letter queue visibility
 - [ ] Build live status updates over WebSockets
 - [ ] Build manual retry/requeue controls for operators
+
+Backend support for Phase 14:
+- [x] `GET /ops/queues` queue depths (Redis)
+- [x] `GET /ops/workers` worker health (PostgreSQL heartbeats)
+- [x] `GET /ops/jobs/dead-lettered` DLQ job list (PostgreSQL)
+- [x] `POST /ops/jobs/{job_id}/requeue` operator requeue
 
 ## Phase 15: Database Additions Still Needed
 
