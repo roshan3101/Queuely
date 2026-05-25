@@ -187,23 +187,25 @@ This document is the execution checklist for the full platform.
 - [x] Build message composer
 - [x] Build real-time streaming of AI responses
 - [x] Build referenced-files panel for each response
-- [ ] Build loading, retry, and disconnected states
+- [x] Build loading, retry, and disconnected states
 - [x] Build responsive layout for laptop and desktop
 
 ## Phase 14: Frontend Operations Dashboard
 
 - [x] Build queue overview widgets
 - [x] Build worker health panel
-- [ ] Build job list with filters
-- [ ] Build job detail drawer/page
+- [x] Build job list with filters
+- [x] Build job detail drawer/page
 - [x] Build dead-letter queue visibility
-- [ ] Build live status updates over WebSockets
+- [x] Build live status updates over WebSockets
 - [x] Build manual retry/requeue controls for operators
 
 Backend support for Phase 14:
 - [x] `GET /ops/queues` queue depths (Redis)
 - [x] `GET /ops/workers` worker health (PostgreSQL heartbeats)
 - [x] `GET /ops/jobs/dead-lettered` DLQ job list (PostgreSQL)
+- [x] `GET /ops/jobs` operator job list with filters
+- [x] `GET /ops/jobs/{job_id}` operator job detail (events included)
 - [x] `POST /ops/jobs/{job_id}/requeue` operator requeue
 
 ## Phase 15: Database Additions Still Needed
@@ -224,13 +226,14 @@ Backend support for Phase 14:
 - [x] Add Dockerfile or compose config for frontend build/runtime split
 - [x] Add API container startup migration step or explicit migration workflow
 - [x] Add worker container health checks
-- [ ] Add PostgreSQL init for required extensions
+- [x] Add PostgreSQL init for required extensions
 - [x] Add Redis persistence and local inspection strategy
 - [x] Add makefile or task runner for local developer workflows
 
 ## Phase 17: Testing
 
 - [x] Add unit tests for prompt assembly, task helpers, and file validation
+- [x] Add unit test coverage for request-size limiting middleware
 - [ ] Add integration tests for API plus PostgreSQL plus Redis
 - [ ] Add worker integration tests for retries and DLQ behavior
 - [ ] Add WebSocket tests for live status updates
@@ -244,8 +247,8 @@ Backend support for Phase 14:
 - [x] Add request size limits
 - [x] Add CORS and trusted host config
 - [ ] Add secret management strategy
-- [ ] Add audit logging for privileged actions
-- [ ] Add abuse controls for AI and upload endpoints
+- [x] Add audit logging for privileged actions
+- [x] Add abuse controls for AI and upload endpoints
 - [ ] Add worker isolation guidance for untrusted workloads
 
 ## Phase 19: Observability
