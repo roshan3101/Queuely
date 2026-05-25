@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from queuely.api.auth import require_active_user
 from queuely.api.dependencies import get_db_session, get_request_id
+from queuely.api.rate_limit import rate_limit_ai_messages
 from queuely.core.config import get_settings
 from queuely.core.exceptions import QueuelyError
 from queuely.core.responses import ApiResponse
@@ -173,6 +174,7 @@ def create_message(
     payload: MessageCreateRequest,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_active_user),
+    _: None = Depends(rate_limit_ai_messages),
     request_id: str | None = Depends(get_request_id),
 ) -> ApiResponse[MessageRead]:
     session_row = db.get(DebugSession, session_id)
@@ -251,6 +253,7 @@ def stream_message(
     payload: MessageCreateRequest,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_active_user),
+    _: None = Depends(rate_limit_ai_messages),
 ) -> StreamingResponse:
     session_row = db.get(DebugSession, session_id)
     if not session_row or session_row.user_id != current_user.id:

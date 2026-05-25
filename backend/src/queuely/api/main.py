@@ -17,7 +17,7 @@ from queuely.api.routes.system import router as system_router
 from queuely.api.routes.ws import router as ws_router
 from queuely.core.config import get_settings
 from queuely.core.logging import configure_logging
-from queuely.core.middleware import RequestContextMiddleware
+from queuely.core.middleware import RequestContextMiddleware, RequestSizeLimitMiddleware
 from queuely.websocket.manager import WebSocketManager
 from queuely.websocket.redis_fanout import run_fanout
 
@@ -66,6 +66,7 @@ def create_app() -> FastAPI:
         )
     if settings.trusted_hosts:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
+    app.add_middleware(RequestSizeLimitMiddleware)
     app.add_middleware(RequestContextMiddleware)
     register_exception_handlers(app)
     app.include_router(auth_router)

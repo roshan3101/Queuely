@@ -27,3 +27,14 @@ def rate_limit_job_submission(
     apply_rate_limit_headers(response, decision.limit, decision.remaining, decision.reset_seconds)
     if not decision.allowed:
         raise QueuelyError("rate_limited", "Rate limit exceeded.", status_code=429)
+
+
+def rate_limit_ai_messages(
+    response: Response,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(require_active_user),
+) -> None:
+    decision = consume_token(session, user_id=current_user.id, bucket_name="ai_message")
+    apply_rate_limit_headers(response, decision.limit, decision.remaining, decision.reset_seconds)
+    if not decision.allowed:
+        raise QueuelyError("rate_limited", "Rate limit exceeded.", status_code=429)

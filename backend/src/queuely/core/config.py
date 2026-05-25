@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     cors_origins_raw: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
     trusted_hosts_raw: str = Field(default="localhost,127.0.0.1", alias="TRUSTED_HOSTS")
     max_upload_size_bytes: int = Field(default=5 * 1024 * 1024, alias="MAX_UPLOAD_SIZE_BYTES")
+    max_request_size_bytes: int = Field(default=2 * 1024 * 1024, alias="MAX_REQUEST_SIZE_BYTES")
 
     @property
     def redis_url(self) -> str:
