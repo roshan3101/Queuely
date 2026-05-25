@@ -11,10 +11,8 @@ export default function ChatMain({
   sendMessage,
   draft,
   setDraft,
-  uploadFile,
   fileMap,
   cancelStream,
-  createSession,
 }: any) {
   return (
     <section className="rounded-[28px] border border-white/10 bg-white/5 backdrop-blur">

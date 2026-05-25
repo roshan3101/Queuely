@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Header from "../components/Header";
 import JobLauncher, { JobDraft } from "../components/JobLauncher";
 
 type ApiResponse<T> = {
@@ -70,19 +71,21 @@ type SessionListRead = { items: SessionRecord[]; total: number; limit: number; o
 type MessageListRead = { items: MessageRecord[]; total: number; limit: number; offset: number };
 type FileListRead = { items: FileRecord[]; total: number; limit: number; offset: number };
 
-const API_BASE_STORAGE_KEY = "queuely.apiBase";
 const TOKEN_STORAGE_KEY = "queuely.accessToken";
+const REFRESH_TOKEN_STORAGE_KEY = "queuely.refreshToken";
 const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const WS_RECONNECT_BASE_MS = 600;
 const WS_RECONNECT_MAX_MS = 8000;
 
 type WsStatus = "disconnected" | "connecting" | "connected" | "error";
 
-function readInitialSetting(key: string, fallback: string): string {
-  if (typeof window === "undefined") {
-    return fallback;
+function readLocalStorage(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
   }
-  return window.localStorage.getItem(key) ?? fallback;
 }
 
 function escapeHtml(value: string): string {
@@ -219,15 +222,47 @@ async function readApiError(response: Response): Promise<string> {
   }
 }
 
-async function apiFetch<T>(baseUrl: string, token: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...(init?.headers ?? {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+type TokenState = { accessToken: string; refreshToken: string };
+
+async function apiFetch<T>(
+  baseUrl: string,
+  tokenState: TokenState,
+  setTokenState: (next: TokenState) => void,
+  path: string,
+  init?: RequestInit
+): Promise<T> {
+  const doFetch = async (accessToken: string) => {
+    return fetch(`${baseUrl}${path}`, {
+      ...init,
+      headers: {
+        Accept: "application/json",
+        ...(init?.headers ?? {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+  };
+
+  let response = await doFetch(tokenState.accessToken);
+
+  if (response.status === 401 && tokenState.refreshToken) {
+    const refreshResp = await fetch(`${baseUrl}/auth/refresh`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: tokenState.refreshToken }),
+    });
+    if (refreshResp.ok) {
+      const refreshPayload = (await refreshResp.json()) as ApiResponse<{
+        tokens: { access_token: string; refresh_token: string };
+      }>;
+      const next: TokenState = {
+        accessToken: refreshPayload.data.tokens.access_token,
+        refreshToken: refreshPayload.data.tokens.refresh_token,
+      };
+      setTokenState(next);
+      response = await doFetch(next.accessToken);
+    }
+  }
+
   if (!response.ok) {
     throw new Error(await readApiError(response));
   }
@@ -306,8 +341,13 @@ function MessageBody({ content }: { content: string }) {
 }
 
 export default function Home() {
-  const [apiBase, setApiBase] = useState(() => readInitialSetting(API_BASE_STORAGE_KEY, DEFAULT_API_BASE));
-  const [token, setToken] = useState(() => readInitialSetting(TOKEN_STORAGE_KEY, ""));
+  const apiBase = DEFAULT_API_BASE;
+  const [tokenState, setTokenState] = useState<TokenState>({ accessToken: "", refreshToken: "" });
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authFullName, setAuthFullName] = useState("");
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageRecord[]>([]);
@@ -376,30 +416,30 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(API_BASE_STORAGE_KEY, apiBase);
-  }, [apiBase]);
+    const accessToken = readLocalStorage(TOKEN_STORAGE_KEY) ?? "";
+    const refreshToken = readLocalStorage(REFRESH_TOKEN_STORAGE_KEY) ?? "";
+    const id = window.setTimeout(() => {
+      setTokenState({ accessToken, refreshToken });
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-  }, [token]);
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, tokenState.accessToken);
+      window.localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, tokenState.refreshToken);
+    } catch {
+      // ignore storage failures (private mode / disabled storage)
+    }
+  }, [tokenState.accessToken, tokenState.refreshToken]);
 
   async function loadSessions(nextActiveSessionId?: string | null) {
     let items: SessionRecord[] = [];
     try {
-      const resp = await fetch(`${apiBase}/sessions`, { headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
-      if (!resp.ok) throw new Error(await readApiError(resp));
-      const payload = (await resp.json()) as ApiResponse<SessionListRead>;
+      const payload = await apiFetch<ApiResponse<SessionListRead>>(apiBase, tokenState, setTokenState, "/sessions");
       items = payload.data.items;
       setSessions(items);
-      // read rate limit headers if present
-      const limit = resp.headers.get("X-RateLimit-Limit");
-      const remaining = resp.headers.get("X-RateLimit-Remaining");
-      const reset = resp.headers.get("X-RateLimit-Reset");
-      const parsed = { limit: limit ? Number(limit) : undefined, remaining: remaining ? Number(remaining) : undefined, reset: reset ? Number(reset) : undefined };
-      setRateLimitInfo(parsed);
-      if (parsed.reset !== undefined) {
-        setRateLimitCountdown(parsed.reset);
-      }
     } catch (err) {
       throw err;
     }
@@ -407,7 +447,7 @@ export default function Home() {
     if (desiredId && desiredId !== activeSessionId) {
       setActiveSessionId(desiredId);
     }
-    if (!items.length && token) {
+    if (!items.length && tokenState.accessToken) {
       await createSession("Debug session");
     }
   }
@@ -416,21 +456,21 @@ export default function Home() {
     const params = new URLSearchParams();
     params.set("limit", String(messageLimit));
     params.set("offset", "0");
-    const payload = await apiFetch<ApiResponse<MessageListRead>>(apiBase, token, `/sessions/${sessionId}/messages?${params.toString()}`);
+    const payload = await apiFetch<ApiResponse<MessageListRead>>(apiBase, tokenState, setTokenState, `/sessions/${sessionId}/messages?${params.toString()}`);
     setMessages(payload.data.items);
     setMessageTotal(payload.data.total);
   }
 
   async function loadFiles() {
-    const payload = await apiFetch<ApiResponse<FileListRead>>(apiBase, token, "/files?limit=100&offset=0");
+    const payload = await apiFetch<ApiResponse<FileListRead>>(apiBase, tokenState, setTokenState, "/files?limit=100&offset=0");
     setFiles(payload.data.items);
   }
 
   async function loadOps() {
     const [queuesPayload, workersPayload, dlqPayload] = await Promise.all([
-      apiFetch<ApiResponse<QueuesRead>>(apiBase, token, "/ops/queues"),
-      apiFetch<ApiResponse<WorkersRead>>(apiBase, token, "/ops/workers"),
-      apiFetch<ApiResponse<DeadLetterJobsRead>>(apiBase, token, "/ops/jobs/dead-lettered?limit=20&offset=0"),
+      apiFetch<ApiResponse<QueuesRead>>(apiBase, tokenState, setTokenState, "/ops/queues"),
+      apiFetch<ApiResponse<WorkersRead>>(apiBase, tokenState, setTokenState, "/ops/workers"),
+      apiFetch<ApiResponse<DeadLetterJobsRead>>(apiBase, tokenState, setTokenState, "/ops/jobs/dead-lettered?limit=20&offset=0"),
     ]);
     setQueues(queuesPayload.data.queues);
     setWorkers(workersPayload.data.workers);
@@ -443,7 +483,7 @@ export default function Home() {
     params.set("offset", String(opsJobsOffset));
     if (opsJobStatus) params.set("status", opsJobStatus);
     if (opsJobType) params.set("job_type", opsJobType);
-    const payload = await apiFetch<ApiResponse<JobListRead>>(apiBase, token, `/ops/jobs?${params.toString()}`);
+    const payload = await apiFetch<ApiResponse<JobListRead>>(apiBase, tokenState, setTokenState, `/ops/jobs?${params.toString()}`);
     setOpsJobs(payload.data.items);
   }
 
@@ -457,7 +497,7 @@ export default function Home() {
   }
 
   async function loadJobDetail(jobId: string) {
-    const payload = await apiFetch<ApiResponse<JobRecord>>(apiBase, token, `/ops/jobs/${jobId}`);
+    const payload = await apiFetch<ApiResponse<JobRecord>>(apiBase, tokenState, setTokenState, `/ops/jobs/${jobId}`);
     setSelectedJob(payload.data);
   }
 
@@ -465,7 +505,10 @@ export default function Home() {
     setApiError(null);
     setOpsBusy(true);
     try {
-      const resp = await fetch(`${apiBase}/files/${fileId}`, { method: "DELETE", headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const resp = await fetch(`${apiBase}/files/${fileId}`, {
+        method: "DELETE",
+        headers: tokenState.accessToken ? { Authorization: `Bearer ${tokenState.accessToken}` } : {},
+      });
       if (!resp.ok) throw new Error(await readApiError(resp));
       await loadFiles();
     } catch (err) {
@@ -486,7 +529,11 @@ export default function Home() {
       try {
         const formData = new FormData();
         formData.append("file", file);
-        const resp = await fetch(`${apiBase}/files/${fileId}/reindex`, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: formData });
+        const resp = await fetch(`${apiBase}/files/${fileId}/reindex`, {
+          method: "POST",
+          headers: tokenState.accessToken ? { Authorization: `Bearer ${tokenState.accessToken}` } : undefined,
+          body: formData,
+        });
         if (!resp.ok) throw new Error(await readApiError(resp));
         await loadFiles();
       } catch (err) {
@@ -499,7 +546,7 @@ export default function Home() {
   }
 
   async function refreshAll() {
-    if (!token) return;
+    if (!tokenState.accessToken) return;
     setApiError(null);
     setIsLoading(true);
     try {
@@ -516,7 +563,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!token) return;
+    if (!tokenState.accessToken) return;
     const initialLoad = window.setTimeout(() => {
       void refreshAll();
     }, 0);
@@ -528,33 +575,33 @@ export default function Home() {
       window.clearInterval(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, apiBase]);
+  }, [tokenState.accessToken, apiBase]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!tokenState.accessToken) return;
     const timer = window.setTimeout(() => {
       void loadOpsJobs().catch(() => undefined);
     }, 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, apiBase, opsJobStatus, opsJobType, opsJobsOffset, opsJobsLimit]);
+  }, [tokenState.accessToken, apiBase, opsJobStatus, opsJobType, opsJobsOffset, opsJobsLimit]);
 
   useEffect(() => {
-    if (!token || !activeSessionId) return;
+    if (!tokenState.accessToken || !activeSessionId) return;
     const timer = window.setTimeout(() => {
       void loadMessages(activeSessionId).catch((error) => {
         setApiError(error instanceof Error ? error.message : "Failed to load messages.");
       });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [activeSessionId, apiBase, token, messageLimit]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeSessionId, apiBase, tokenState.accessToken, messageLimit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     selectedJobIdRef.current = selectedJob?.id ?? null;
   }, [selectedJob]);
 
   useEffect(() => {
-    if (!token || !isOnline) {
+    if (!tokenState.accessToken || !isOnline) {
       wsRef.current?.close();
       wsRef.current = null;
       window.setTimeout(() => setWsStatus("disconnected"), 0);
@@ -567,7 +614,7 @@ export default function Home() {
       window.setTimeout(() => setWsStatus("connecting"), 0);
 
       const wsUrl = new URL(toWsUrl(apiBase));
-      wsUrl.searchParams.set("token", token);
+      wsUrl.searchParams.set("token", tokenState.accessToken);
       // include last sync time to enable replay on reconnect
       if (lastSyncAt) {
         wsUrl.searchParams.set("since", lastSyncAt);
@@ -637,7 +684,7 @@ export default function Home() {
       window.setTimeout(() => setWsStatus("disconnected"), 0);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiBase, token, isOnline]);
+  }, [apiBase, tokenState.accessToken, isOnline]);
 
   useEffect(() => {
     if (rateLimitCountdown === null) return;
@@ -666,7 +713,7 @@ export default function Home() {
 
   async function createSession(title?: string) {
     const nextTitle = title ?? (sessionTitle.trim() || `Debug session ${new Date().toLocaleString()}`);
-    const payload = await apiFetch<ApiResponse<SessionRecord>>(apiBase, token, "/sessions", {
+    const payload = await apiFetch<ApiResponse<SessionRecord>>(apiBase, tokenState, setTokenState, "/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: nextTitle }),
@@ -710,7 +757,7 @@ export default function Home() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(tokenState.accessToken ? { Authorization: `Bearer ${tokenState.accessToken}` } : {}),
         },
         body: JSON.stringify({ content }),
       });
@@ -783,7 +830,9 @@ export default function Home() {
     try {
       const response = await fetch(`${apiBase}/sessions/${activeSessionId}/messages/${messageId}/cancel`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" },
+        headers: tokenState.accessToken
+          ? { Authorization: `Bearer ${tokenState.accessToken}`, "Content-Type": "application/json" }
+          : { "Content-Type": "application/json" },
       });
       if (!response.ok) {
         throw new Error(await readApiError(response));
@@ -808,7 +857,7 @@ export default function Home() {
     try {
       const response = await fetch(`${apiBase}/files`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: tokenState.accessToken ? { Authorization: `Bearer ${tokenState.accessToken}` } : undefined,
         body: formData,
       });
       if (!response.ok) {
@@ -828,7 +877,7 @@ export default function Home() {
     try {
       const response = await fetch(`${apiBase}/ops/jobs/${jobId}/requeue`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: tokenState.accessToken ? { Authorization: `Bearer ${tokenState.accessToken}` } : undefined,
       });
       if (!response.ok) {
         throw new Error(await readApiError(response));
@@ -907,7 +956,7 @@ export default function Home() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(tokenState.accessToken ? { Authorization: `Bearer ${tokenState.accessToken}` } : {}),
         },
         body: JSON.stringify(buildJobPayload()),
       });
@@ -936,61 +985,124 @@ export default function Home() {
   }
 
   const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
+  const isAuthed = Boolean(tokenState.accessToken);
+
+  async function submitAuth() {
+    setApiError(null);
+    setIsLoading(true);
+    try {
+      const path = authMode === "login" ? "/auth/login" : "/auth/register";
+      const body =
+        authMode === "login"
+          ? { email: authEmail.trim(), password: authPassword }
+          : { email: authEmail.trim(), password: authPassword, full_name: authFullName.trim() || null };
+
+      const resp = await fetch(`${apiBase}${path}`, {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) throw new Error(await readApiError(resp));
+      const payload = (await resp.json()) as ApiResponse<{ user: { email: string }; tokens: { access_token: string; refresh_token: string } }>;
+      const next: TokenState = { accessToken: payload.data.tokens.access_token, refreshToken: payload.data.tokens.refresh_token };
+      setTokenState(next);
+      setUserEmail(payload.data.user.email);
+      setAuthPassword("");
+      await refreshAll();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Authentication failed.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function logout() {
+    setApiError(null);
+    try {
+      if (tokenState.refreshToken) {
+        await fetch(`${apiBase}/auth/logout`, {
+          method: "POST",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: tokenState.refreshToken }),
+        }).catch(() => undefined);
+      }
+    } finally {
+      setTokenState({ accessToken: "", refreshToken: "" });
+      setUserEmail(null);
+      setSessions([]);
+      setMessages([]);
+      setFiles([]);
+      setQueues([]);
+      setWorkers([]);
+      setDeadLetters([]);
+      setOpsJobs([]);
+      setActiveSessionId(null);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(20,184,166,0.18),_transparent_35%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.14),_transparent_30%),linear-gradient(180deg,_#081018_0%,_#02060b_100%)] text-zinc-100">
       <div className="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-4 px-4 py-4 lg:px-6">
-        <header className="rounded-[28px] border border-white/10 bg-white/5 px-5 py-4 shadow-2xl shadow-cyan-950/10 backdrop-blur">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300/80">Queuely</p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">Debug sessions, retrieval, and ops in one surface</h1>
-              <p className="mt-1 max-w-3xl text-sm text-zinc-400">
-                Session memory, codebase context, streaming assistant replies, and queue operations are wired against the backend.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">API Base</span>
-                <input
-                  value={apiBase}
-                  onChange={(event) => setApiBase(event.target.value)}
-                  className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600"
-                />
-              </label>
-              <label className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">JWT</span>
-                <input
-                  value={token}
-                  onChange={(event) => setToken(event.target.value)}
-                  className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600"
-                  placeholder="Bearer token"
-                />
-              </label>
-              <div className="flex items-end gap-2">
+        <Header
+          userEmail={userEmail}
+          onLogout={logout}
+          createSession={createSession}
+          refreshAll={refreshAll}
+          isLoading={isLoading}
+          rateLimitInfo={rateLimitInfo}
+          rateLimitCountdown={rateLimitCountdown}
+          wsStatus={wsStatus}
+        />
+
+        {!isAuthed ? (
+          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-zinc-500">Authentication</p>
+                <h2 className="mt-2 text-xl font-semibold text-white">{authMode === "login" ? "Sign in" : "Create an account"}</h2>
+                <p className="mt-1 text-sm text-zinc-400">No manual tokens. This UI logs in against `POST /auth/login` (or registers via `POST /auth/register`).</p>
+              </div>
+              <div className="flex gap-2">
                 <button
-                  onClick={() => void refreshAll()}
-                  className="h-11 rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-4 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20"
+                  onClick={() => setAuthMode("login")}
+                  className={`h-10 rounded-2xl border px-4 text-sm transition ${authMode === "login" ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-100" : "border-white/10 bg-black/20 text-zinc-200 hover:bg-black/30"}`}
                 >
-                  Refresh
+                  Login
                 </button>
                 <button
-                  onClick={() => void createSession()}
-                  className="h-11 rounded-2xl bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                  onClick={() => setAuthMode("register")}
+                  className={`h-10 rounded-2xl border px-4 text-sm transition ${authMode === "register" ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-100" : "border-white/10 bg-black/20 text-zinc-200 hover:bg-black/30"}`}
                 >
-                  New session
+                  Register
                 </button>
               </div>
             </div>
-            {rateLimitInfo ? (
-              <div className="mt-2 text-[12px] text-zinc-400">Rate limit: {rateLimitInfo.remaining ?? "?"}/{rateLimitInfo.limit ?? "?"} reset in {rateLimitInfo.reset ?? "?"}s</div>
-            ) : null}
-          </div>
-        </header>
 
-        {!token ? (
-          <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-            Paste a JWT access token to load sessions and ops data.
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <label className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+                <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">Email</span>
+                <input value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600" placeholder="you@example.com" />
+              </label>
+              <label className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+                <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">Password</span>
+                <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600" placeholder="min 8 chars" />
+              </label>
+              <div className="flex items-end gap-2">
+                {authMode === "register" ? (
+                  <label className="flex-1 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+                    <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">Full name (optional)</span>
+                    <input value={authFullName} onChange={(e) => setAuthFullName(e.target.value)} className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600" placeholder="Your name" />
+                  </label>
+                ) : null}
+                <button
+                  onClick={() => void submitAuth()}
+                  disabled={!authEmail.trim() || authPassword.length < 8 || isLoading}
+                  className="h-11 rounded-2xl bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -1055,7 +1167,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              disabled={!token || isLoading}
+              disabled={!isAuthed || isLoading}
               onClick={() => void refreshAll()}
               className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-zinc-200 transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-40"
             >
