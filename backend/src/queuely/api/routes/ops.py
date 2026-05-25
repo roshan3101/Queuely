@@ -13,9 +13,19 @@ from queuely.core.responses import ApiResponse
 from queuely.core.exceptions import QueuelyError
 from queuely.db.job_store import add_event
 from queuely.models.job import Job, JobStatus, JobType
+from queuely.models.rate_limit import RateLimitBucket
 from queuely.models.worker import WorkerHeartbeat
 from queuely.schemas.jobs import JobListResponse, JobRead
-from queuely.schemas.ops import DeadLetterJobsRead, QueuesRead, QueueDepth, RequeueResponse, WorkerRead, WorkersRead
+from queuely.schemas.ops import (
+    DeadLetterJobsRead,
+    QueueDepth,
+    QueuesRead,
+    RateLimitBucketRead,
+    RateLimitBucketsRead,
+    RequeueResponse,
+    WorkerRead,
+    WorkersRead,
+)
 from queuely.services.jobs import JOB_QUEUE_MAP, JOB_TASK_MAP, serialize_job
 from queuely.tasks.celery_app import celery_app
 
@@ -38,6 +48,44 @@ async def queues(
         depth = int(await redis_client.llen(name))
         depths.append(QueueDepth(name=name, depth=depth))
     return ApiResponse(data=QueuesRead(queues=depths), request_id=request_id)
+
+
+@router.get("/rate-limits", response_model=ApiResponse[RateLimitBucketsRead])
+def rate_limits(
+    session: Session = Depends(get_db_session),
+    current_user: object = Depends(require_superuser),
+    request_id: str | None = Depends(get_request_id),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    user_id: str | None = Query(default=None),
+    bucket_name: str | None = Query(default=None),
+) -> ApiResponse[RateLimitBucketsRead]:
+    filters = []
+    if user_id:
+        filters.append(RateLimitBucket.user_id == user_id)
+    if bucket_name:
+        filters.append(RateLimitBucket.bucket_name == bucket_name)
+
+    total = session.scalar(select(func.count()).select_from(RateLimitBucket).where(*filters)) or 0
+    stmt = (
+        select(RateLimitBucket)
+        .where(*filters)
+        .order_by(RateLimitBucket.last_refill_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = [
+        RateLimitBucketRead(
+            user_id=row.user_id,
+            bucket_name=row.bucket_name,
+            capacity=row.capacity,
+            refill_rate=row.refill_rate,
+            tokens=row.tokens,
+            last_refill_at=row.last_refill_at,
+        )
+        for row in session.scalars(stmt)
+    ]
+    return ApiResponse(data=RateLimitBucketsRead(items=items, total=total, limit=limit, offset=offset), request_id=request_id)
 
 
 @router.get("/workers", response_model=ApiResponse[WorkersRead])

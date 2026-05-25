@@ -85,7 +85,7 @@ def mark_succeeded(session: Session, job: Job, *, result: dict | None) -> None:
         status=JobStatus.succeeded,
         event_type="job_succeeded",
         message="Job completed successfully.",
-        metadata={},
+        metadata={"result": result or {}},
     )
 
 
@@ -112,7 +112,7 @@ def mark_failed(session: Session, job: Job, *, error_message: str) -> None:
         status=JobStatus.failed,
         event_type="job_failed",
         message="Job failed.",
-        metadata={"error": error_message},
+        metadata={"error": error_message, "result": job.result or {}},
     )
 
 
@@ -125,5 +125,5 @@ def mark_dead_lettered(session: Session, job: Job, *, error_message: str) -> Non
         status=JobStatus.dead_lettered,
         event_type="job_dead_lettered",
         message="Job exhausted retries and was dead-lettered.",
-        metadata={"error": error_message},
+        metadata={"error": error_message, "result": job.result or {}},
     )

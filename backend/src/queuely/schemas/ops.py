@@ -40,3 +40,19 @@ class RequeueResponse(BaseModel):
     requeued: bool
     new_status: str
     celery_task_id: str | None
+
+
+class RateLimitBucketRead(BaseModel):
+    user_id: str
+    bucket_name: str
+    capacity: int
+    refill_rate: float
+    tokens: float
+    last_refill_at: datetime
+
+
+class RateLimitBucketsRead(BaseModel):
+    items: list[RateLimitBucketRead]
+    total: int
+    limit: int
+    offset: int
