@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import JobLauncher, { JobDraft } from "../components/JobLauncher";
 
 type ApiResponse<T> = {
   success: boolean;
@@ -313,20 +314,48 @@ export default function Home() {
   const [draft, setDraft] = useState("");
   const [sessionTitle, setSessionTitle] = useState("");
   const [files, setFiles] = useState<FileRecord[]>([]);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{ limit?: number; remaining?: number; reset?: number } | null>(null);
+  const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null);
   const [queues, setQueues] = useState<QueueDepth[]>([]);
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [deadLetters, setDeadLetters] = useState<JobRecord[]>([]);
   const [opsJobs, setOpsJobs] = useState<JobRecord[]>([]);
+  const [opsJobsOffset, setOpsJobsOffset] = useState<number>(0);
+  const [opsJobsLimit] = useState<number>(30);
   const [opsJobStatus, setOpsJobStatus] = useState<string>("");
   const [opsJobType, setOpsJobType] = useState<string>("");
   const [selectedJob, setSelectedJob] = useState<JobRecord | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [messageLimit, setMessageLimit] = useState<number>(100);
+  const [messageTotal, setMessageTotal] = useState<number | null>(null);
+  const [fileDetails, setFileDetails] = useState<FileRecord | null>(null);
+  const [jobDraft, setJobDraft] = useState<JobDraft>({
+    jobType: "pdf_processing",
+    pdfFilePath: "",
+    pdfPreviewChars: "500",
+    pdfEnableOcr: true,
+    pdfEnableTables: true,
+    reportTitle: "",
+    reportFormat: "json",
+    reportProvider: "template",
+    reportProviderModel: "",
+    reportSummary: "",
+    reportSections: "",
+    emailTo: "",
+    emailSubject: "",
+    emailBody: "",
+    emailHtml: "",
+    emailDryRun: true,
+  });
   const [isStreaming, setIsStreaming] = useState(false);
   const [opsBusy, setOpsBusy] = useState(false);
   const [wsStatus, setWsStatus] = useState<WsStatus>("disconnected");
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [wsReconnectAttempt, setWsReconnectAttempt] = useState<number>(0);
+  const [lastPingAt, setLastPingAt] = useState<string | null>(null);
+  const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsReconnectAttemptRef = useRef(0);
@@ -355,20 +384,41 @@ export default function Home() {
   }, [token]);
 
   async function loadSessions(nextActiveSessionId?: string | null) {
-    const payload = await apiFetch<ApiResponse<SessionListRead>>(apiBase, token, "/sessions");
-    setSessions(payload.data.items);
-    const desiredId = nextActiveSessionId ?? activeSessionId ?? payload.data.items[0]?.id ?? null;
+    let items: SessionRecord[] = [];
+    try {
+      const resp = await fetch(`${apiBase}/sessions`, { headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+      if (!resp.ok) throw new Error(await readApiError(resp));
+      const payload = (await resp.json()) as ApiResponse<SessionListRead>;
+      items = payload.data.items;
+      setSessions(items);
+      // read rate limit headers if present
+      const limit = resp.headers.get("X-RateLimit-Limit");
+      const remaining = resp.headers.get("X-RateLimit-Remaining");
+      const reset = resp.headers.get("X-RateLimit-Reset");
+      const parsed = { limit: limit ? Number(limit) : undefined, remaining: remaining ? Number(remaining) : undefined, reset: reset ? Number(reset) : undefined };
+      setRateLimitInfo(parsed);
+      if (parsed.reset !== undefined) {
+        setRateLimitCountdown(parsed.reset);
+      }
+    } catch (err) {
+      throw err;
+    }
+    const desiredId = nextActiveSessionId ?? activeSessionId ?? items[0]?.id ?? null;
     if (desiredId && desiredId !== activeSessionId) {
       setActiveSessionId(desiredId);
     }
-    if (!payload.data.items.length && token) {
+    if (!items.length && token) {
       await createSession("Debug session");
     }
   }
 
   async function loadMessages(sessionId: string) {
-    const payload = await apiFetch<ApiResponse<MessageListRead>>(apiBase, token, `/sessions/${sessionId}/messages?limit=100&offset=0`);
+    const params = new URLSearchParams();
+    params.set("limit", String(messageLimit));
+    params.set("offset", "0");
+    const payload = await apiFetch<ApiResponse<MessageListRead>>(apiBase, token, `/sessions/${sessionId}/messages?${params.toString()}`);
     setMessages(payload.data.items);
+    setMessageTotal(payload.data.total);
   }
 
   async function loadFiles() {
@@ -389,17 +439,63 @@ export default function Home() {
 
   async function loadOpsJobs() {
     const params = new URLSearchParams();
-    params.set("limit", "30");
-    params.set("offset", "0");
+    params.set("limit", String(opsJobsLimit));
+    params.set("offset", String(opsJobsOffset));
     if (opsJobStatus) params.set("status", opsJobStatus);
     if (opsJobType) params.set("job_type", opsJobType);
     const payload = await apiFetch<ApiResponse<JobListRead>>(apiBase, token, `/ops/jobs?${params.toString()}`);
     setOpsJobs(payload.data.items);
   }
 
+  async function prevOpsPage() {
+    if (opsJobsOffset <= 0) return;
+    setOpsJobsOffset(Math.max(0, opsJobsOffset - opsJobsLimit));
+  }
+
+  async function nextOpsPage() {
+    setOpsJobsOffset(opsJobsOffset + opsJobsLimit);
+  }
+
   async function loadJobDetail(jobId: string) {
     const payload = await apiFetch<ApiResponse<JobRecord>>(apiBase, token, `/ops/jobs/${jobId}`);
     setSelectedJob(payload.data);
+  }
+
+  async function deleteFile(fileId: string) {
+    setApiError(null);
+    setOpsBusy(true);
+    try {
+      const resp = await fetch(`${apiBase}/files/${fileId}`, { method: "DELETE", headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!resp.ok) throw new Error(await readApiError(resp));
+      await loadFiles();
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Failed to delete file.");
+    } finally {
+      setOpsBusy(false);
+    }
+  }
+
+  async function reindexFilePrompt(fileId: string) {
+    // create a temporary file input to choose a replacement file for reindex
+    const input = document.createElement("input");
+    input.type = "file";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setOpsBusy(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const resp = await fetch(`${apiBase}/files/${fileId}/reindex`, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: formData });
+        if (!resp.ok) throw new Error(await readApiError(resp));
+        await loadFiles();
+      } catch (err) {
+        setApiError(err instanceof Error ? err.message : "Failed to reindex file.");
+      } finally {
+        setOpsBusy(false);
+      }
+    };
+    input.click();
   }
 
   async function refreshAll() {
@@ -441,7 +537,7 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, apiBase, opsJobStatus, opsJobType]);
+  }, [token, apiBase, opsJobStatus, opsJobType, opsJobsOffset, opsJobsLimit]);
 
   useEffect(() => {
     if (!token || !activeSessionId) return;
@@ -452,6 +548,14 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [activeSessionId, apiBase, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!token || !activeSessionId) return;
+    void loadMessages(activeSessionId).catch((error) => {
+      setApiError(error instanceof Error ? error.message : "Failed to load messages.");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageLimit]);
 
   useEffect(() => {
     selectedJobIdRef.current = selectedJob?.id ?? null;
@@ -472,17 +576,33 @@ export default function Home() {
 
       const wsUrl = new URL(toWsUrl(apiBase));
       wsUrl.searchParams.set("token", token);
+      // include last sync time to enable replay on reconnect
+      if (lastSyncAt) {
+        wsUrl.searchParams.set("since", lastSyncAt);
+      }
       const socket = new WebSocket(wsUrl.toString());
       wsRef.current = socket;
 
       socket.onopen = () => {
         wsReconnectAttemptRef.current = 0;
+        setWsReconnectAttempt(0);
         setWsStatus("connected");
       };
 
       socket.onmessage = (event) => {
         try {
-          const payload = JSON.parse(String(event.data)) as { type?: string; job_id?: string };
+          const payload = JSON.parse(String(event.data)) as {
+            type?: string;
+            job_id?: string;
+            sent_at?: string;
+            connection_id?: string;
+            replayed?: boolean;
+          };
+          if (payload.type === "ping") {
+            // show last ping time for UX
+            setLastPingAt(payload.sent_at ?? new Date().toISOString());
+            return;
+          }
           if (payload.type === "job_event") {
             // Debounce ops refreshes when many events arrive.
             if (opsRefreshTimerRef.current) {
@@ -511,6 +631,7 @@ export default function Home() {
         if (closed) return;
         window.setTimeout(() => setWsStatus("disconnected"), 0);
         const attempt = (wsReconnectAttemptRef.current += 1);
+        setWsReconnectAttempt(attempt);
         const delay = Math.min(WS_RECONNECT_MAX_MS, WS_RECONNECT_BASE_MS * 2 ** Math.min(8, attempt));
         window.setTimeout(connect, delay);
       };
@@ -525,6 +646,20 @@ export default function Home() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase, token, isOnline]);
+
+  useEffect(() => {
+    if (rateLimitCountdown === null) return;
+    const start = Date.now();
+    let remaining = rateLimitCountdown;
+    setRateLimitCountdown(remaining);
+    const id = setInterval(() => {
+      remaining = Math.max(0, rateLimitCountdown - Math.floor((Date.now() - start) / 1000));
+      setRateLimitCountdown(remaining);
+      if (remaining <= 0) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rateLimitInfo?.reset]);
 
   async function createSession(title?: string) {
     const nextTitle = title ?? (sessionTitle.trim() || `Debug session ${new Date().toLocaleString()}`);
@@ -555,6 +690,7 @@ export default function Home() {
       referenced_files: [],
     };
     const assistantId = crypto.randomUUID();
+    let activeAssistantId = assistantId;
     const assistantMessage: MessageRecord = {
       id: assistantId,
       role: "assistant",
@@ -600,17 +736,29 @@ export default function Home() {
             .map((line) => line.slice(5).trim())
             .join("\n");
 
+          if (eventName === "meta") {
+            // server-assigned assistant message id
+            try {
+              const serverId = data;
+              setCurrentStreamingMessageId(serverId);
+              activeAssistantId = serverId;
+              // patch the temporary assistant id to the server id
+              setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, id: serverId } : message)));
+            } catch {
+              // ignore
+            }
+          }
+
           if (eventName === "delta") {
             setMessages((current) =>
-              current.map((message) =>
-                message.id === assistantId ? { ...message, content: `${message.content}${data}` } : message,
-              ),
+              current.map((message) => (message.id === activeAssistantId ? { ...message, content: `${message.content}${data}` } : message)),
             );
           }
 
           if (eventName === "done") {
             await loadMessages(activeSessionId);
             await loadFiles();
+            setCurrentStreamingMessageId(null);
           }
 
           separatorIndex = buffer.indexOf("\n\n");
@@ -621,6 +769,29 @@ export default function Home() {
       await loadMessages(activeSessionId);
     } finally {
       setIsStreaming(false);
+    }
+  }
+
+  async function cancelStream() {
+    if (!activeSessionId) return;
+    const messageId = currentStreamingMessageId;
+    if (!messageId) return;
+    setApiError(null);
+    try {
+      const response = await fetch(`${apiBase}/sessions/${activeSessionId}/messages/${messageId}/cancel`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+      // refresh messages to reflect cancellation
+      await loadMessages(activeSessionId);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Failed to cancel stream.");
+    } finally {
+      setIsStreaming(false);
+      setCurrentStreamingMessageId(null);
     }
   }
 
@@ -662,6 +833,100 @@ export default function Home() {
       await loadOps();
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "Failed to requeue job.");
+    } finally {
+      setOpsBusy(false);
+    }
+  }
+
+  function buildReportSectionsInput(raw: string): Array<{ heading: string; body: string }> {
+    return raw
+      .split(/\n\s*\n/g)
+      .map((block) => block.trim())
+      .filter(Boolean)
+      .map((block, index) => {
+        const lines = block.split("\n");
+        const heading = lines[0]?.trim() || `Section ${index + 1}`;
+        const body = lines.slice(1).join("\n").trim();
+        return { heading, body };
+      });
+  }
+
+  function buildJobPayload() {
+    if (jobDraft.jobType === "pdf_processing") {
+      return {
+        job_type: "pdf_processing",
+        payload: {
+          file_path: jobDraft.pdfFilePath.trim(),
+          preview_chars: Number(jobDraft.pdfPreviewChars || "500"),
+          enable_ocr: jobDraft.pdfEnableOcr,
+          enable_table_extraction: jobDraft.pdfEnableTables,
+        },
+        priority: 5,
+        max_retries: 3,
+      };
+    }
+
+    if (jobDraft.jobType === "report_generation") {
+      return {
+        job_type: "report_generation",
+        payload: {
+          title: jobDraft.reportTitle.trim() || undefined,
+          format: jobDraft.reportFormat,
+          provider: jobDraft.reportProvider,
+          provider_model: jobDraft.reportProviderModel.trim() || undefined,
+          summary: jobDraft.reportSummary.trim() || undefined,
+          sections: buildReportSectionsInput(jobDraft.reportSections),
+        },
+        priority: 5,
+        max_retries: 2,
+      };
+    }
+
+    return {
+      job_type: "email_sending",
+      payload: {
+        to: jobDraft.emailTo.trim(),
+        subject: jobDraft.emailSubject.trim(),
+        body: jobDraft.emailBody,
+        html: jobDraft.emailHtml.trim() || undefined,
+        dry_run: jobDraft.emailDryRun,
+      },
+      priority: 6,
+      max_retries: 2,
+    };
+  }
+
+  async function submitJob() {
+    setApiError(null);
+    setOpsBusy(true);
+    try {
+      const response = await fetch(`${apiBase}/jobs`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(buildJobPayload()),
+      });
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+      const limit = response.headers.get("X-RateLimit-Limit");
+      const remaining = response.headers.get("X-RateLimit-Remaining");
+      const reset = response.headers.get("X-RateLimit-Reset");
+      setRateLimitInfo({
+        limit: limit ? Number(limit) : undefined,
+        remaining: remaining ? Number(remaining) : undefined,
+        reset: reset ? Number(reset) : undefined,
+      });
+      if (reset) {
+        setRateLimitCountdown(Number(reset));
+      }
+      const payload = (await response.json()) as ApiResponse<JobRecord>;
+      await Promise.all([loadOps(), loadOpsJobs()]);
+      await loadJobDetail(payload.data.id);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Failed to submit job.");
     } finally {
       setOpsBusy(false);
     }
@@ -714,6 +979,9 @@ export default function Home() {
                 </button>
               </div>
             </div>
+            {rateLimitInfo ? (
+              <div className="mt-2 text-[12px] text-zinc-400">Rate limit: {rateLimitInfo.remaining ?? "?"}/{rateLimitInfo.limit ?? "?"} reset in {rateLimitInfo.reset ?? "?"}s</div>
+            ) : null}
           </div>
         </header>
 
@@ -762,7 +1030,22 @@ export default function Home() {
               }`}
             >
               ws: {wsStatus}
+              {wsReconnectAttempt > 0 ? ` (attempt ${wsReconnectAttempt})` : null}
+              {lastPingAt ? ` • ping ${new Date(lastPingAt).toLocaleTimeString()}` : null}
             </span>
+            <button
+              disabled={!wsRef.current || wsStatus !== "connected"}
+              onClick={() => {
+                try {
+                  wsRef.current?.send(JSON.stringify({ type: "replay" }));
+                } catch {
+                  // ignore
+                }
+              }}
+              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-zinc-200 transition hover:bg-black/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Resync
+            </button>
             <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">
               last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : "never"}
             </span>
@@ -849,17 +1132,37 @@ export default function Home() {
                 {files.slice(0, 8).map((file) => (
                   <div key={file.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm text-white">{file.original_name}</span>
+                      <button onClick={() => setFileDetails(file)} className="truncate text-sm text-white text-left">
+                        {file.original_name}
+                      </button>
                       <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">{file.status}</span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-xs text-zinc-500">
                       <span>{file.language ?? "plain text"}</span>
                       <span>{formatBytes(file.size_bytes)}</span>
                     </div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => reindexFilePrompt(file.id)}
+                        disabled={opsBusy}
+                        className="rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-zinc-200 transition hover:bg-black/30 disabled:opacity-40"
+                      >
+                        Reindex
+                      </button>
+                      <button
+                        onClick={() => deleteFile(file.id)}
+                        disabled={opsBusy}
+                        className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100 transition hover:bg-rose-500/20 disabled:opacity-40"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
+
+            <JobLauncher jobDraft={jobDraft} setJobDraft={setJobDraft} submitJob={() => void submitJob()} opsBusy={opsBusy} />
           </aside>
 
           <section className="rounded-[28px] border border-white/10 bg-white/5 backdrop-blur">
@@ -878,6 +1181,19 @@ export default function Home() {
 
             <div className="max-h-[calc(100vh-23rem)] min-h-[28rem] overflow-y-auto px-5 py-5">
               <div className="space-y-4">
+                {messageTotal && messageTotal > messages.length ? (
+                  <div className="mb-2 text-center">
+                    <button
+                      onClick={() => {
+                        setMessageLimit(messageLimit + 100);
+                        void loadMessages(activeSessionId!);
+                      }}
+                      className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-zinc-200 transition hover:bg-black/30"
+                    >
+                      Load more messages ({messageTotal - messages.length} older)
+                    </button>
+                  </div>
+                ) : null}
                 {messages.map((message) => (
                   <article
                     key={message.id}
@@ -916,13 +1232,23 @@ export default function Home() {
                   <div className="text-xs text-zinc-500">
                     Streaming uses <code>POST /sessions/{"{session_id}"}/messages/stream</code> and persists the final assistant response plus provenance.
                   </div>
-                  <button
-                    disabled={!activeSessionId || !draft.trim() || isStreaming}
-                    onClick={() => void sendMessage()}
-                    className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {isStreaming ? "Sending..." : "Send message"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={!activeSessionId || !draft.trim() || isStreaming}
+                      onClick={() => void sendMessage()}
+                      className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {isStreaming ? "Sending..." : "Send message"}
+                    </button>
+                    {isStreaming ? (
+                      <button
+                        onClick={() => void cancelStream()}
+                        className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/20"
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1036,14 +1362,22 @@ export default function Home() {
                         <span className="truncate text-sm text-white">{job.job_type}</span>
                         <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">{job.status}</span>
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-xs text-zinc-500">
-                        <span className="truncate">{job.queue_name}</span>
-                        <span className="font-mono">{shortId(job.id)}</span>
-                      </div>
+                        <div className="mt-1 flex items-center justify-between text-xs text-zinc-500">
+                          <span className="truncate">{job.queue_name}</span>
+                          <span className="font-mono">{shortId(job.id)}</span>
+                        </div>
+                        <div className="mt-1 text-xs text-zinc-400 max-h-12 overflow-hidden">{job.error_message ? job.error_message : JSON.stringify(job.result ?? {})}</div>
                     </button>
                   ))}
                   {!opsJobs.length ? <p className="text-sm text-zinc-500">No jobs loaded.</p> : null}
                 </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="text-xs text-zinc-400">Showing {opsJobs.length} jobs</div>
+                    <div className="flex gap-2">
+                      <button onClick={() => { prevOpsPage(); void loadOpsJobs(); }} disabled={opsJobsOffset<=0} className="rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-xs text-zinc-200">Prev</button>
+                      <button onClick={() => { nextOpsPage(); void loadOpsJobs(); }} className="rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-xs text-zinc-200">Next</button>
+                    </div>
+                  </div>
               </section>
 
               <section className="rounded-[22px] border border-white/10 bg-black/20 p-4">
@@ -1132,6 +1466,48 @@ export default function Home() {
                 <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-black/30 p-3 text-[12px] text-zinc-100">
                   {JSON.stringify(selectedJob.payload ?? {}, null, 2)}
                 </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {fileDetails ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur sm:items-center">
+          <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-white/10 bg-[#060c12] shadow-2xl shadow-black/60">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-zinc-500">File</p>
+                <h3 className="mt-1 text-lg font-semibold text-white">{fileDetails.original_name}</h3>
+              </div>
+              <button onClick={() => setFileDetails(null)} className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-zinc-200">Close</button>
+            </div>
+            <div className="grid gap-4 px-5 py-5 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs uppercase tracking-[0.22em] text-zinc-500">File info</div>
+                <div className="mt-2 space-y-2 text-sm text-zinc-200">
+                  <div>
+                    <div className="text-[11px] text-zinc-500">Name</div>
+                    <div>{fileDetails.original_name}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-zinc-500">Language</div>
+                    <div>{fileDetails.language ?? "plain text"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-zinc-500">Size</div>
+                    <div>{formatBytes(fileDetails.size_bytes)}</div>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={() => reindexFilePrompt(fileDetails.id)} disabled={opsBusy} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200">Reindex</button>
+                  <button onClick={async () => { await deleteFile(fileDetails.id); setFileDetails(null); }} disabled={opsBusy} className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">Delete</button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs uppercase tracking-[0.22em] text-zinc-500">Preview</div>
+                <div className="mt-2 max-h-56 overflow-auto text-sm text-zinc-200">
+                  <pre className="whitespace-pre-wrap">{fileDetails.original_name}</pre>
+                </div>
               </div>
             </div>
           </div>
