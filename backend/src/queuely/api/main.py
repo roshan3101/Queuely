@@ -18,6 +18,8 @@ from queuely.api.routes.ws import router as ws_router
 from queuely.core.config import get_settings
 from queuely.core.logging import configure_logging
 from queuely.core.middleware import RequestContextMiddleware, RequestSizeLimitMiddleware
+from queuely.core.seed import seed_superuser
+from queuely.db.session import SessionLocal
 from queuely.websocket.manager import WebSocketManager
 from queuely.websocket.redis_fanout import run_fanout
 
@@ -32,6 +34,11 @@ async def lifespan(app: FastAPI):
     redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
     app.state.redis = redis_client
     app.state.ws_manager = WebSocketManager()
+
+    # Dev convenience: create/promote a superuser if SEED_SUPERUSER_* env vars are set.
+    with SessionLocal() as db:
+        seed_superuser(db, settings)
+
     stop_event = asyncio.Event()
     fanout_task = asyncio.create_task(run_fanout(redis_client, app.state.ws_manager, stop_event))
     logger.info("Application startup complete")

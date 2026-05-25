@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     pdf_scan_text_threshold: int = Field(default=24, alias="PDF_SCAN_TEXT_THRESHOLD")
     tesseract_cmd: str | None = Field(default=None, alias="TESSERACT_CMD")
 
+    # Local/dev convenience: create (or promote) an initial superuser at startup.
+    seed_superuser_email: str | None = Field(default=None, alias="SEED_SUPERUSER_EMAIL")
+    seed_superuser_password: str | None = Field(default=None, alias="SEED_SUPERUSER_PASSWORD")
+    seed_superuser_full_name: str | None = Field(default=None, alias="SEED_SUPERUSER_FULL_NAME")
+
     @property
     def redis_url(self) -> str:
         auth_part = ""
