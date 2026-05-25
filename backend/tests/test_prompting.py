@@ -20,10 +20,11 @@ def test_clamp_prompt_stays_within_budget() -> None:
             PromptPiece(role="assistant", content="Here is the retry flow."),
             PromptPiece(role="user", content="Now summarize it in one paragraph."),
         ],
+        conversation_summary="The conversation has focused on Celery worker retry behavior and operator visibility.",
         max_input_tokens=120,
     )
 
     total_tokens = sum(estimate_tokens(model, item["content"]) + 4 for item in messages)
     assert total_tokens <= 120
     assert messages[0]["role"] == "system"
-
+    assert any("Conversation summary:" in item["content"] for item in messages if item["role"] == "system")

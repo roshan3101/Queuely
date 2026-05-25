@@ -78,10 +78,10 @@ This document is the execution checklist for the full platform.
 - [x] Implement base task class with shared job lookup and state updates
 - [x] Implement job state transitions from `pending` to terminal states
 - [x] Implement worker heartbeat updates in PostgreSQL
-- [ ] Implement placeholder execution pipelines for:
-  - [x] PDF processing (placeholder)
-  - [x] Report generation (placeholder)
-  - [x] Email sending (placeholder)
+- [x] Implement execution pipelines for:
+  - [x] PDF processing
+  - [x] Report generation
+  - [x] Email sending
 - [x] Persist task results to PostgreSQL
 - [x] Persist task failure details to PostgreSQL (job.error_message updated; events emitted)
 
@@ -101,9 +101,9 @@ This document is the execution checklist for the full platform.
 - [x] Build session manager for active WebSocket clients
 - [x] Publish job state changes to subscribers
 - [x] Bridge worker state updates into WebSocket broadcasts
-- [ ] Support streaming updates for job progress and final results
-- [ ] Add heartbeat/ping handling for WebSocket clients
-- [ ] Add reconnect-safe client semantics
+- [x] Support streaming updates for job progress and final results
+- [x] Add heartbeat/ping handling for WebSocket clients
+- [x] Add reconnect-safe client semantics
 
 ## Phase 8: Rate Limiting
 
@@ -113,7 +113,7 @@ This document is the execution checklist for the full platform.
 - [x] Add per-route rate-limit configuration
 - [x] Return standard rate-limit headers
 - [x] Return clear over-limit errors
-- [ ] Add admin/operator visibility into rate-limit state if needed
+- [x] Add admin/operator visibility into rate-limit state if needed
 
 ## Phase 9: Memory Management System
 
@@ -124,31 +124,31 @@ This document is the execution checklist for the full platform.
 - [x] Generate embedding for every stored message
 - [x] Store message role, session id, timestamps, and metadata
 - [x] On each new message, retrieve top 5 semantically similar past exchanges
-- [ ] Define similarity search query and score thresholds
-- [ ] Add recency-aware ranking so stale matches do not dominate
+- [x] Define similarity search query and score thresholds
+- [x] Add recency-aware ranking so stale matches do not dominate
 - [x] Inject retrieved memory context into the system prompt builder
-- [ ] Prevent duplicate or low-value retrievals
-- [ ] Add retention and pruning rules for long-lived sessions
+- [x] Prevent duplicate or low-value retrievals
+- [x] Add retention and pruning rules for long-lived sessions
 
 ## Phase 10: Context Window Management
 
-- [ ] Define token budget allocation for:
-  - [ ] system prompt
-  - [ ] memory retrieval
-  - [ ] codebase context
-  - [ ] conversation history
-  - [ ] model response headroom
+- [x] Define token budget allocation for:
+  - [x] system prompt
+  - [x] memory retrieval
+  - [x] codebase context
+  - [x] conversation history
+  - [x] model response headroom
 - [x] Implement token counting service
 - [x] Implement prompt assembly pipeline
 - [x] Truncate low-priority context when near token limit
-- [ ] Prefer summaries over raw history when needed
+- [x] Prefer summaries over raw history when needed
 - [x] Add safeguards so prompt construction never exceeds model limits
-- [ ] Log context composition for debugging
+- [x] Log context composition for debugging
 
 ## Phase 11: Codebase Context / File RAG
 
 - [x] Build file upload API for source files
-- [ ] Validate file types, size limits, and malware-safe handling
+- [x] Validate file types, size limits, and malware-safe handling
 - [x] Store uploaded file metadata in PostgreSQL
 - [x] Persist original files in controlled storage (local disk for dev)
 - [x] Chunk uploaded files (line-based; language stored when detectable)
@@ -158,8 +158,8 @@ This document is the execution checklist for the full platform.
 - [x] Inject retrieved chunks into prompt context
 - [x] Track which files and chunk ids were used in each response
 - [x] Return referenced files in API responses for frontend display
-- [ ] Add re-index flow when a file is replaced
-- [ ] Add deletion flow for uploaded files and derived chunks
+- [x] Add re-index flow when a file is replaced
+- [x] Add deletion flow for uploaded files and derived chunks
 
 ## Phase 12: AI Conversation Orchestration
 
@@ -174,7 +174,7 @@ This document is the execution checklist for the full platform.
   - [x] retrieved code chunks
 - [x] Persist assistant responses incrementally or on completion (completion today; incremental pending)
 - [x] Persist retrieval provenance per response
-- [ ] Support cancellation of in-flight AI generation
+- [x] Support cancellation of in-flight AI generation
 
 ## Phase 13: Frontend Session Experience
 
