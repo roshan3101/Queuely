@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+import json
 import logging
 import time
 
@@ -20,6 +21,7 @@ from queuely.db.session import SessionLocal
 from queuely.models.context import ConversationMessage, DebugSession, MessageRole, ResponseReference, ResponseSourceType
 from queuely.models.user import User
 from queuely.schemas.context import (
+    MessageCancelRead,
     MessageCreateRequest,
     MessageListRead,
     MessageRead,
@@ -31,6 +33,7 @@ from queuely.services.ai_chat import complete, stream_complete
 from queuely.services.ai_embeddings import embed_text
 from queuely.services.prompting import PromptPiece, clamp_prompt
 from queuely.services.retrieval import retrieve_similar_file_chunks, retrieve_similar_messages
+from queuely.services.stream_control import stream_cancellation_registry
 
 
 settings = get_settings()
@@ -63,6 +66,51 @@ def _serialize_message(row: ConversationMessage) -> MessageRead:
         created_at=row.created_at,
         referenced_files=referenced_files,
     )
+
+
+def _append_message_meta(row: ConversationMessage, **updates: object) -> None:
+    meta = dict(row.meta or {})
+    meta.update(updates)
+    row.meta = meta
+
+
+def _session_summary(db: Session, *, session_row: DebugSession, current_user: User) -> str | None:
+    stmt = (
+        select(ConversationMessage)
+        .where(ConversationMessage.session_id == session_row.id, ConversationMessage.user_id == current_user.id)
+        .order_by(ConversationMessage.sequence_number.asc())
+    )
+    messages = list(db.scalars(stmt))
+    if len(messages) <= settings.prompt_recent_messages_limit:
+        return session_row.summary
+
+    older = messages[:-settings.prompt_recent_messages_limit]
+    summary_lines = [f"[{message.role.value}] {message.content[:160]}" for message in older[-12:]]
+    if not summary_lines:
+        return session_row.summary
+    summary = "\n".join(summary_lines)
+    session_row.summary = summary
+    return summary
+
+
+def _apply_memory_retention(db: Session, *, current_user: User) -> None:
+    cutoff = datetime.now(UTC) - timedelta(days=settings.memory_retention_max_age_days)
+    stmt = (
+        select(ConversationMessage)
+        .where(
+            ConversationMessage.user_id == current_user.id,
+            ConversationMessage.embedding.is_not(None),
+            ConversationMessage.role.in_([MessageRole.user, MessageRole.assistant]),
+        )
+        .order_by(ConversationMessage.created_at.desc())
+    )
+    rows = list(db.scalars(stmt))
+    for index, message in enumerate(rows):
+        should_prune = index >= settings.memory_retention_messages_per_user or message.created_at < cutoff
+        if not should_prune or message.embedding is None:
+            continue
+        message.embedding = None
+        _append_message_meta(message, retention_pruned=True)
 
 
 @router.post("", response_model=ApiResponse[SessionRead], status_code=status.HTTP_201_CREATED)
@@ -158,6 +206,7 @@ def _compose_prompt(
     recent = list(reversed(list(db.scalars(stmt))))
     recent_pieces = [PromptPiece(role=m.role.value, content=m.content) for m in recent]
     recent_pieces.append(PromptPiece(role="user", content=user_message))
+    summary = _session_summary(db, session_row=session_row, current_user=current_user)
 
     system_prompt = session_row.system_prompt or "You are a senior backend engineer. Be concise and correct."
     messages = clamp_prompt(
@@ -166,17 +215,24 @@ def _compose_prompt(
         retrieved_memory=retrieved_memory,
         retrieved_chunks=retrieved_chunks,
         recent_messages=recent_pieces,
+        conversation_summary=summary,
         max_input_tokens=settings.prompt_max_input_tokens,
     )
 
     elapsed_ms = (time.perf_counter() - started) * 1000.0
     logger.info(
-        "prompt_compose user_id=%s session_id=%s mem=%d chunks=%d recent=%d elapsed_ms=%.2f",
+        "prompt_compose user_id=%s session_id=%s mem=%d chunks=%d recent=%d summary=%s budgets={system:%d,memory:%d,code:%d,history:%d,headroom:%d} elapsed_ms=%.2f",
         current_user.id,
         session_row.id,
         len(mem),
         len(chunks),
         len(recent_pieces),
+        "yes" if summary else "no",
+        settings.prompt_system_budget_tokens,
+        settings.prompt_memory_budget_tokens,
+        settings.prompt_code_budget_tokens,
+        settings.prompt_history_budget_tokens,
+        settings.prompt_response_headroom_tokens,
         elapsed_ms,
     )
     return messages, mem, chunks
@@ -208,6 +264,7 @@ def create_message(
     )
     db.add(user_msg)
     db.flush()
+    _apply_memory_retention(db, current_user=current_user)
 
     prompt, mem, chunks = _compose_prompt(db, current_user=current_user, session_row=session_row, user_message=payload.content)
     assistant_text = complete(prompt)
@@ -285,6 +342,7 @@ def stream_message(
     )
     db.add(user_msg)
     db.flush()
+    _apply_memory_retention(db, current_user=current_user)
 
     prompt, mem, chunks = _compose_prompt(db, current_user=current_user, session_row=session_row, user_message=payload.content)
     assistant_seq = user_seq + 1
@@ -301,48 +359,91 @@ def stream_message(
     db.commit()
 
     assistant_id = assistant_msg.id
+    stream_cancellation_registry.create(assistant_id)
 
     def gen() -> Iterator[bytes]:
         # SSE: emit assistant_message_id then deltas.
         yield f"event: meta\ndata: {assistant_id}\n\n".encode("utf-8")
         full = []
-        for delta in stream_complete(prompt):
-            full.append(delta)
-            yield f"event: delta\ndata: {delta}\n\n".encode("utf-8")
-        text = "".join(full)
-        # Persist final content, embeddings, and provenance once.
-        with SessionLocal() as write_session:
-            assistant = write_session.get(ConversationMessage, assistant_id)
-            if assistant is not None:
-                assistant.content = text
-                assistant.embedding = embed_text(text) if text else None
-                rank = 1
-                for message, dist in mem:
-                    write_session.add(
-                        ResponseReference(
-                            assistant_message_id=assistant.id,
-                            source_type=ResponseSourceType.memory_message,
-                            referenced_message_id=message.id,
-                            rank=rank,
-                            similarity_score=float(1.0 - dist),
-                            snippet=message.content[:500],
-                        )
+        cancelled = False
+        try:
+            for delta in stream_complete(prompt, should_cancel=lambda: stream_cancellation_registry.is_cancelled(assistant_id)):
+                full.append(delta)
+                yield f"event: delta\ndata: {delta}\n\n".encode("utf-8")
+            cancelled = stream_cancellation_registry.is_cancelled(assistant_id)
+            text = "".join(full)
+            with SessionLocal() as write_session:
+                assistant = write_session.get(ConversationMessage, assistant_id)
+                if assistant is not None:
+                    assistant.content = text
+                    assistant.embedding = embed_text(text) if text else None
+                    _append_message_meta(
+                        assistant,
+                        streaming_status="cancelled" if cancelled else "completed",
+                        cancelled_at=datetime.now(UTC).isoformat() if cancelled else None,
                     )
-                    rank += 1
-                for chunk, dist in chunks:
-                    write_session.add(
-                        ResponseReference(
-                            assistant_message_id=assistant.id,
-                            source_type=ResponseSourceType.file_chunk,
-                            referenced_file_id=chunk.file_id,
-                            referenced_chunk_id=chunk.id,
-                            rank=rank,
-                            similarity_score=float(1.0 - dist),
-                            snippet=chunk.content[:500],
+                    rank = 1
+                    for message, dist in mem:
+                        write_session.add(
+                            ResponseReference(
+                                assistant_message_id=assistant.id,
+                                source_type=ResponseSourceType.memory_message,
+                                referenced_message_id=message.id,
+                                rank=rank,
+                                similarity_score=float(1.0 - dist),
+                                snippet=message.content[:500],
+                            )
                         )
-                    )
-                    rank += 1
-                write_session.commit()
-        yield b"event: done\ndata: ok\n\n"
+                        rank += 1
+                    for chunk, dist in chunks:
+                        write_session.add(
+                            ResponseReference(
+                                assistant_message_id=assistant.id,
+                                source_type=ResponseSourceType.file_chunk,
+                                referenced_file_id=chunk.file_id,
+                                referenced_chunk_id=chunk.id,
+                                rank=rank,
+                                similarity_score=float(1.0 - dist),
+                                snippet=chunk.content[:500],
+                            )
+                        )
+                        rank += 1
+                    write_session.commit()
+            if cancelled:
+                yield b"event: cancelled\ndata: cancelled\n\n"
+            else:
+                yield b"event: done\ndata: ok\n\n"
+        except Exception as exc:
+            with SessionLocal() as write_session:
+                assistant = write_session.get(ConversationMessage, assistant_id)
+                if assistant is not None:
+                    _append_message_meta(assistant, streaming_status="failed", error=str(exc))
+                    write_session.commit()
+            error_payload = json.dumps({"message": "stream_failed", "detail": str(exc)})
+            yield f"event: error\ndata: {error_payload}\n\n".encode("utf-8")
+        finally:
+            stream_cancellation_registry.clear(assistant_id)
 
     return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+@router.post("/{session_id}/messages/{message_id}/cancel", response_model=ApiResponse[MessageCancelRead])
+def cancel_stream_message(
+    session_id: str,
+    message_id: str,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_active_user),
+    request_id: str | None = Depends(get_request_id),
+) -> ApiResponse[MessageCancelRead]:
+    message = db.get(ConversationMessage, message_id)
+    if not message or message.session_id != session_id or message.user_id != current_user.id:
+        raise QueuelyError("message_not_found", "Message not found.", status_code=404)
+    if message.role != MessageRole.assistant:
+        raise QueuelyError("invalid_message_role", "Only assistant messages can be cancelled.", status_code=400)
+
+    cancelled = stream_cancellation_registry.cancel(message_id)
+    if cancelled:
+        _append_message_meta(message, cancellation_requested_at=datetime.now(UTC).isoformat(), streaming_status="cancelling")
+        db.commit()
+
+    return ApiResponse(data=MessageCancelRead(message_id=message_id, cancelled=cancelled), request_id=request_id)

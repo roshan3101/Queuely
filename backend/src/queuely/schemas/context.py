@@ -46,11 +46,21 @@ class MessageListRead(BaseModel):
     offset: int
 
 
+class MessageCancelRead(BaseModel):
+    message_id: str
+    cancelled: bool
+
+
 class FileUploadResponse(BaseModel):
     file_id: str
     status: str
     original_name: str
     size_bytes: int
+
+
+class FileDeleteResponse(BaseModel):
+    file_id: str
+    deleted: bool
 
 
 class FileRead(BaseModel):

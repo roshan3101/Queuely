@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from openai import OpenAI
 
@@ -22,10 +22,15 @@ def complete(messages: list[dict[str, str]]) -> str:
     return resp.choices[0].message.content or ""
 
 
-def stream_complete(messages: list[dict[str, str]]) -> Iterable[str]:
+def stream_complete(
+    messages: list[dict[str, str]],
+    *,
+    should_cancel: Callable[[], bool] | None = None,
+) -> Iterable[str]:
     stream = _client().chat.completions.create(model=settings.openai_model, messages=messages, stream=True)
     for event in stream:
+        if should_cancel and should_cancel():
+            break
         delta = event.choices[0].delta.content
         if delta:
             yield delta
-
