@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
+import logging
+import time
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import StreamingResponse
@@ -33,6 +35,7 @@ from queuely.services.retrieval import retrieve_similar_file_chunks, retrieve_si
 
 settings = get_settings()
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+logger = logging.getLogger(__name__)
 
 
 def _serialize_session(row: DebugSession) -> SessionRead:
@@ -136,6 +139,7 @@ def _compose_prompt(
     session_row: DebugSession,
     user_message: str,
 ) -> tuple[list[dict[str, str]], list[tuple[str, object]], list[tuple[str, object]]]:
+    started = time.perf_counter()
     query_embedding = embed_text(user_message)
 
     mem = retrieve_similar_messages(db, user_id=current_user.id, query_embedding=query_embedding, top_k=settings.retrieval_top_k)
@@ -165,6 +169,16 @@ def _compose_prompt(
         max_input_tokens=settings.prompt_max_input_tokens,
     )
 
+    elapsed_ms = (time.perf_counter() - started) * 1000.0
+    logger.info(
+        "prompt_compose user_id=%s session_id=%s mem=%d chunks=%d recent=%d elapsed_ms=%.2f",
+        current_user.id,
+        session_row.id,
+        len(mem),
+        len(chunks),
+        len(recent_pieces),
+        elapsed_ms,
+    )
     return messages, mem, chunks
 
 
