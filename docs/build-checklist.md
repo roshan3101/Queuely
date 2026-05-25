@@ -68,16 +68,16 @@ This document is the execution checklist for the full platform.
 
 ## Phase 5: Queueing and Worker Execution
 
-- [ ] Configure Celery queues for:
-  - [ ] `jobs.default`
-  - [ ] `jobs.pdf`
-  - [ ] `jobs.report`
-  - [ ] `jobs.email`
-  - [ ] `jobs.dlq`
-- [ ] Implement worker startup config and queue routing
-- [ ] Implement base task class with shared job lookup and state updates
-- [ ] Implement job state transitions from `pending` to terminal states
-- [ ] Implement worker heartbeat updates in PostgreSQL
+- [x] Configure Celery queues for:
+  - [x] `jobs.default`
+  - [x] `jobs.pdf`
+  - [x] `jobs.report`
+  - [x] `jobs.email`
+  - [x] `jobs.dlq`
+- [x] Implement worker startup config and queue routing
+- [x] Implement base task class with shared job lookup and state updates
+- [x] Implement job state transitions from `pending` to terminal states
+- [x] Implement worker heartbeat updates in PostgreSQL
 - [ ] Implement placeholder execution pipelines for:
   - [ ] PDF processing
   - [ ] Report generation
@@ -87,11 +87,11 @@ This document is the execution checklist for the full platform.
 
 ## Phase 6: Retries and Dead Letter Queue
 
-- [ ] Implement retry policy per job type
-- [ ] Add exponential backoff calculation
-- [ ] Persist retry counts and retry events
-- [ ] Route exhausted jobs to `jobs.dlq`
-- [ ] Mark dead-lettered jobs in PostgreSQL
+- [x] Implement retry policy per job type
+- [x] Add exponential backoff calculation
+- [x] Persist retry counts and retry events
+- [x] Route exhausted jobs to `jobs.dlq`
+- [x] Mark dead-lettered jobs in PostgreSQL
 - [ ] Expose dead-lettered jobs in operator APIs
 - [ ] Add replay/requeue capability for dead-lettered jobs
 
