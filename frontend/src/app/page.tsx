@@ -64,6 +64,7 @@ type JobRecord = {
 type QueuesRead = { queues: QueueDepth[] };
 type WorkersRead = { workers: WorkerRecord[] };
 type DeadLetterJobsRead = { items: JobRecord[]; total: number; limit: number; offset: number };
+type JobListRead = { items: JobRecord[]; total: number; limit: number; offset: number };
 type SessionListRead = { items: SessionRecord[]; total: number; limit: number; offset: number };
 type MessageListRead = { items: MessageRecord[]; total: number; limit: number; offset: number };
 type FileListRead = { items: FileRecord[]; total: number; limit: number; offset: number };
@@ -71,6 +72,10 @@ type FileListRead = { items: FileRecord[]; total: number; limit: number; offset:
 const API_BASE_STORAGE_KEY = "queuely.apiBase";
 const TOKEN_STORAGE_KEY = "queuely.accessToken";
 const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const WS_RECONNECT_BASE_MS = 600;
+const WS_RECONNECT_MAX_MS = 8000;
+
+type WsStatus = "disconnected" | "connecting" | "connected" | "error";
 
 function readInitialSetting(key: string, fallback: string): string {
   if (typeof window === "undefined") {
@@ -238,6 +243,14 @@ function shortId(value: string): string {
   return value.length <= 12 ? value : `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
+function toWsUrl(apiBase: string): string {
+  const url = new URL(apiBase);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/ws";
+  url.search = "";
+  return url.toString();
+}
+
 function ReferencedFiles({
   files,
   referencedIds,
@@ -303,13 +316,33 @@ export default function Home() {
   const [queues, setQueues] = useState<QueueDepth[]>([]);
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [deadLetters, setDeadLetters] = useState<JobRecord[]>([]);
+  const [opsJobs, setOpsJobs] = useState<JobRecord[]>([]);
+  const [opsJobStatus, setOpsJobStatus] = useState<string>("");
+  const [opsJobType, setOpsJobType] = useState<string>("");
+  const [selectedJob, setSelectedJob] = useState<JobRecord | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [opsBusy, setOpsBusy] = useState(false);
+  const [wsStatus, setWsStatus] = useState<WsStatus>("disconnected");
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const wsReconnectAttemptRef = useRef(0);
 
   const fileMap = useMemo(() => Object.fromEntries(files.map((file) => [file.id, file])), [files]);
+
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(API_BASE_STORAGE_KEY, apiBase);
@@ -352,6 +385,21 @@ export default function Home() {
     setDeadLetters(dlqPayload.data.items);
   }
 
+  async function loadOpsJobs() {
+    const params = new URLSearchParams();
+    params.set("limit", "30");
+    params.set("offset", "0");
+    if (opsJobStatus) params.set("status", opsJobStatus);
+    if (opsJobType) params.set("job_type", opsJobType);
+    const payload = await apiFetch<ApiResponse<JobListRead>>(apiBase, token, `/ops/jobs?${params.toString()}`);
+    setOpsJobs(payload.data.items);
+  }
+
+  async function loadJobDetail(jobId: string) {
+    const payload = await apiFetch<ApiResponse<JobRecord>>(apiBase, token, `/ops/jobs/${jobId}`);
+    setSelectedJob(payload.data);
+  }
+
   async function refreshAll() {
     if (!token) return;
     setApiError(null);
@@ -361,6 +409,7 @@ export default function Home() {
       if (activeSessionId) {
         await loadMessages(activeSessionId);
       }
+      setLastSyncAt(new Date().toISOString());
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "Failed to load dashboard data.");
     } finally {
@@ -384,6 +433,15 @@ export default function Home() {
   }, [token, apiBase]);
 
   useEffect(() => {
+    if (!token) return;
+    const timer = window.setTimeout(() => {
+      void loadOpsJobs().catch(() => undefined);
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, apiBase, opsJobStatus, opsJobType]);
+
+  useEffect(() => {
     if (!token || !activeSessionId) return;
     const timer = window.setTimeout(() => {
       void loadMessages(activeSessionId).catch((error) => {
@@ -392,6 +450,64 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [activeSessionId, apiBase, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!token || !isOnline) {
+      wsRef.current?.close();
+      wsRef.current = null;
+      window.setTimeout(() => setWsStatus("disconnected"), 0);
+      return;
+    }
+
+    let closed = false;
+    const connect = () => {
+      if (closed) return;
+      window.setTimeout(() => setWsStatus("connecting"), 0);
+
+      const wsUrl = new URL(toWsUrl(apiBase));
+      wsUrl.searchParams.set("token", token);
+      const socket = new WebSocket(wsUrl.toString());
+      wsRef.current = socket;
+
+      socket.onopen = () => {
+        wsReconnectAttemptRef.current = 0;
+        setWsStatus("connected");
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(String(event.data)) as { type?: string };
+          if (payload.type === "job_event") {
+            void loadOps().catch(() => undefined);
+          }
+        } catch {
+          // ignore
+        }
+      };
+
+      socket.onerror = () => {
+        setWsStatus("error");
+      };
+
+      socket.onclose = () => {
+        wsRef.current = null;
+        if (closed) return;
+        window.setTimeout(() => setWsStatus("disconnected"), 0);
+        const attempt = (wsReconnectAttemptRef.current += 1);
+        const delay = Math.min(WS_RECONNECT_MAX_MS, WS_RECONNECT_BASE_MS * 2 ** Math.min(8, attempt));
+        window.setTimeout(connect, delay);
+      };
+    };
+
+    connect();
+    return () => {
+      closed = true;
+      wsRef.current?.close();
+      wsRef.current = null;
+      window.setTimeout(() => setWsStatus("disconnected"), 0);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBase, token, isOnline]);
 
   async function createSession(title?: string) {
     const nextTitle = title ?? (sessionTitle.trim() || `Debug session ${new Date().toLocaleString()}`);
@@ -584,9 +700,66 @@ export default function Home() {
           </div>
         </header>
 
-        {apiError ? (
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{apiError}</div>
+        {!token ? (
+          <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+            Paste a JWT access token to load sessions and ops data.
+          </div>
         ) : null}
+
+        {apiError ? (
+          <div className="flex flex-col gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            <div>{apiError}</div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => void refreshAll()}
+                className="rounded-xl border border-rose-500/30 bg-black/20 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:bg-black/30"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => setApiError(null)}
+                className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-zinc-200 transition hover:bg-black/30"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-xs text-zinc-300 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full border px-3 py-1 ${
+                isOnline
+                  ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+                  : "border-rose-400/20 bg-rose-400/10 text-rose-100"
+              }`}
+            >
+              {isOnline ? "online" : "offline"}
+            </span>
+            <span
+              className={`rounded-full border px-3 py-1 ${
+                wsStatus === "connected"
+                  ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-100"
+                  : "border-white/10 bg-black/20 text-zinc-300"
+              }`}
+            >
+              ws: {wsStatus}
+            </span>
+            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">
+              last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : "never"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={!token || isLoading}
+              onClick={() => void refreshAll()}
+              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-zinc-200 transition hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Sync now
+            </button>
+          </div>
+        </div>
 
         <div className="grid flex-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)_420px]">
           <aside className="rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur">
@@ -807,6 +980,57 @@ export default function Home() {
 
               <section className="rounded-[22px] border border-white/10 bg-black/20 p-4">
                 <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-white">Jobs</h3>
+                  <button
+                    onClick={() => void loadOpsJobs()}
+                    className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-semibold text-zinc-200 transition hover:bg-black/30"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Status</span>
+                    <input
+                      value={opsJobStatus}
+                      onChange={(event) => setOpsJobStatus(event.target.value)}
+                      className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600"
+                      placeholder="queued"
+                    />
+                  </label>
+                  <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Type</span>
+                    <input
+                      value={opsJobType}
+                      onChange={(event) => setOpsJobType(event.target.value)}
+                      className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600"
+                      placeholder="pdf_processing"
+                    />
+                  </label>
+                </div>
+                <div className="mt-3 max-h-72 space-y-2 overflow-auto pr-1">
+                  {opsJobs.map((job) => (
+                    <button
+                      key={job.id}
+                      onClick={() => void loadJobDetail(job.id)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left transition hover:border-cyan-400/30 hover:bg-cyan-400/10"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm text-white">{job.job_type}</span>
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">{job.status}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-xs text-zinc-500">
+                        <span className="truncate">{job.queue_name}</span>
+                        <span className="font-mono">{shortId(job.id)}</span>
+                      </div>
+                    </button>
+                  ))}
+                  {!opsJobs.length ? <p className="text-sm text-zinc-500">No jobs loaded.</p> : null}
+                </div>
+              </section>
+
+              <section className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-white">Dead letters</h3>
                   <span className="text-xs text-zinc-500">{deadLetters.length} items</span>
                 </div>
@@ -837,6 +1061,65 @@ export default function Home() {
           </aside>
         </div>
       </div>
+
+      {selectedJob ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur sm:items-center">
+          <div className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-white/10 bg-[#060c12] shadow-2xl shadow-black/60">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-zinc-500">Job detail</p>
+                <h3 className="mt-1 text-lg font-semibold text-white">{selectedJob.job_type}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedJob(null)}
+                className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-zinc-200 transition hover:bg-black/40"
+              >
+                Close
+              </button>
+            </div>
+            <div className="grid gap-4 px-5 py-5 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs uppercase tracking-[0.22em] text-zinc-500">Identifiers</div>
+                <div className="mt-2 space-y-2 text-sm text-zinc-200">
+                  <div>
+                    <div className="text-[11px] text-zinc-500">Job ID</div>
+                    <div className="font-mono">{selectedJob.id}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-zinc-500">Queue</div>
+                    <div>{selectedJob.queue_name}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-zinc-500">Status</div>
+                    <div>{selectedJob.status}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs uppercase tracking-[0.22em] text-zinc-500">Error / Result</div>
+                <div className="mt-2 space-y-2 text-sm text-zinc-200">
+                  <div>
+                    <div className="text-[11px] text-zinc-500">Error</div>
+                    <div className="max-h-24 overflow-auto whitespace-pre-wrap">{selectedJob.error_message ?? "None"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-zinc-500">Result</div>
+                    <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-black/30 p-3 text-[12px] text-zinc-100">
+                      {JSON.stringify(selectedJob.result ?? {}, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+              <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs uppercase tracking-[0.22em] text-zinc-500">Payload</div>
+                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-black/30 p-3 text-[12px] text-zinc-100">
+                  {JSON.stringify(selectedJob.payload ?? {}, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
