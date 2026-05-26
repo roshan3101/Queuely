@@ -1,0 +1,73 @@
+# ── render.yaml ───────────────────────────────────────────────────────────────
+services:
+  - type: postgres
+    name: queuely-db
+    plan: free
+
+  - type: redis
+    name: queuely-redis
+    plan: free
+
+  - type: web
+    name: queuely-api
+    env: python             
+    repo: https://github.com/roshan3101/Queuely
+    
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r backend/requirements.txt
+    # Start Phase ------------------------------------------------
+    startCommand: |
+      # $PORT is supplied by Render for HTTP traffic
+      uvicorn queuely.api.main:app \
+        --host 0.0.0.0 \
+        --port $PORT
+    # Environment variables -------------------------------------------------
+    envVars:
+      # FastAPI pulls most of its config from .env (see .env.prod)
+      - key: ENVIRONMENT
+        value: production
+      # Render‑provided vars (you can reference them, they will be resolved at deploy)
+      - key: DATABASE_URL
+        fromService: queuely-db   # pulls the generated DATABASE_URL
+      - key: REDIS_URL
+        fromService: queuely-redis
+      # Celery needs explicit broker / result URLs – we reuse REDIS_URL
+      - key: CELERY_BROKER_URL
+        value: ${REDIS_URL}
+      - key: CELERY_RESULT_BACKEND
+        value: ${REDIS_URL}
+      # JWT secret – keep it secret in Render (set manually in UI or via .env.prod)
+      - key: JWT_SECRET_KEY
+        value: ${JWT_SECRET_KEY}
+      # Optional – put any other secrets you added to .env.prod here
+      #   e.g. OPENAI_API_KEY, CLOUDINARY_*, SMTP_*, etc.
+      # --------------------------------------------------------------
+
+  # --------------------------------------------------------------
+  # 4️⃣  Celery worker (background) – runs the task queue
+  # --------------------------------------------------------------
+  - type: background
+    name: queuely-worker
+    env: python
+    repo: https://github.com/roshan3101/Queuely   # same repo
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r backend/requirements.txt
+    startCommand: |
+      celery -A queuely.celery_app worker \
+        --loglevel=info
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromService: queuely-db
+      - key: REDIS_URL
+        fromService: queuely-redis
+      - key: CELERY_BROKER_URL
+        value: ${REDIS_URL}
+      - key: CELERY_RESULT_BACKEND
+        value: ${REDIS_URL}
+      - key: JWT_SECRET_KEY
+        value: ${JWT_SECRET_KEY}
+      # (copy any other secrets you need, same as API service)
