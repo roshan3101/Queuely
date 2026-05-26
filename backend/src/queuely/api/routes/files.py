@@ -16,7 +16,9 @@ from queuely.core.responses import ApiResponse
 from queuely.models.context import DebugSession, FileChunk, UploadedFile, UploadedFileStatus
 from queuely.models.user import User
 from queuely.schemas.context import FileDeleteResponse, FileListRead, FileRead, FileUploadResponse
+from queuely.job_processors.pdf_processing import PdfProcessingPayload, extract_pdf_content
 from queuely.services.ai_embeddings import embed_text
+from queuely.services.cloudinary_storage import destroy_asset, is_configured as is_cloudinary_configured, upload_bytes
 
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -29,6 +31,7 @@ ALLOWED_EXTENSIONS = {
     ".jsx",
     ".json",
     ".md",
+    ".pdf",
     ".sql",
     ".yaml",
     ".yml",
@@ -44,6 +47,40 @@ DISALLOWED_MAGIC_PREFIXES = (b"MZ", b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xfe\xed\
 
 def _storage_root() -> Path:
     return Path("backend") / "storage" / "uploads"
+
+
+def _file_extension(filename: str) -> str:
+    return os.path.splitext(filename.lower())[1]
+
+
+def _storage_meta_provider() -> str:
+    return "cloudinary" if is_cloudinary_configured() else "local"
+
+
+def _apply_storage_meta(
+    row: UploadedFile,
+    *,
+    provider: str,
+    storage_url: str,
+    public_id: str | None = None,
+) -> None:
+    meta = dict(row.meta or {})
+    meta.update(
+        {
+            "storage_provider": provider,
+            "storage_url": storage_url,
+        }
+    )
+    if public_id:
+        meta["cloudinary_public_id"] = public_id
+    row.meta = meta
+
+
+def _stored_asset_info(row: UploadedFile) -> tuple[str, str | None]:
+    meta = row.meta or {}
+    provider = str(meta.get("storage_provider") or "local")
+    public_id = meta.get("cloudinary_public_id")
+    return provider, str(public_id) if public_id else None
 
 
 def _sha256(data: bytes) -> str:
@@ -79,7 +116,7 @@ def _chunk_lines(text: str, *, lines_per_chunk: int = 200) -> list[tuple[int, in
 
 def _validate_upload(filename: str, data: bytes) -> None:
     size_bytes = len(data)
-    ext = os.path.splitext(filename.lower())[1]
+    ext = _file_extension(filename)
     if ext not in ALLOWED_EXTENSIONS:
         raise QueuelyError("unsupported_file_type", f"Unsupported file type: {ext or 'unknown'}.", status_code=400)
     if size_bytes > settings.max_upload_size_bytes:
@@ -91,6 +128,7 @@ def _validate_upload(filename: str, data: bytes) -> None:
 
 
 def _serialize_file(row: UploadedFile) -> FileRead:
+    meta = row.meta or {}
     return FileRead(
         id=row.id,
         session_id=row.session_id,
@@ -100,6 +138,8 @@ def _serialize_file(row: UploadedFile) -> FileRead:
         size_bytes=row.size_bytes,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        storage_provider=str(meta.get("storage_provider")) if meta.get("storage_provider") else None,
+        storage_url=str(meta.get("storage_url")) if meta.get("storage_url") else None,
     )
 
 
@@ -123,13 +163,31 @@ def _replace_file_chunks(
 ) -> None:
     digest = _sha256(data)
     language = _guess_language(original_name)
+    extension = _file_extension(original_name)
 
-    root = _storage_root() / row.user_id
-    root.mkdir(parents=True, exist_ok=True)
-    storage_path = root / f"{digest}_{original_name}"
-    storage_path.write_bytes(data)
+    old_provider, old_public_id = _stored_asset_info(row)
+    old_storage_path = Path(row.storage_path) if row.storage_path and old_provider == "local" else None
 
-    old_storage_path = Path(row.storage_path) if row.storage_path else None
+    if is_cloudinary_configured():
+        asset = upload_bytes(
+            data,
+            filename=original_name,
+            folder=settings.cloudinary_folder,
+            resource_type="raw",
+            public_id=f"{row.user_id}/{digest}",
+            content_type=content_type,
+        )
+        if asset is None:
+            raise RuntimeError("Cloudinary upload was not configured or failed unexpectedly.")
+        storage_path = Path(asset.secure_url)
+        _apply_storage_meta(row, provider="cloudinary", storage_url=asset.secure_url, public_id=asset.public_id)
+    else:
+        root = _storage_root() / row.user_id
+        root.mkdir(parents=True, exist_ok=True)
+        storage_path = root / f"{digest}_{original_name}"
+        storage_path.write_bytes(data)
+        _apply_storage_meta(row, provider="local", storage_url=str(storage_path))
+
     for chunk in list(row.chunks):
         db.delete(chunk)
     db.flush()
@@ -143,7 +201,11 @@ def _replace_file_chunks(
     row.size_bytes = len(data)
     row.status = UploadedFileStatus.processing
 
-    text = data.decode("utf-8", errors="replace")
+    if extension == ".pdf" and row.meta.get("storage_provider") == "cloudinary" and row.meta.get("storage_url"):
+        pages, _metadata = extract_pdf_content(PdfProcessingPayload(cloudinary_url=str(row.meta["storage_url"])))
+        text = "\n\n".join(page.text for page in pages if page.text.strip())
+    else:
+        text = data.decode("utf-8", errors="replace")
     chunks = _chunk_lines(text)
     for idx, (start, end, content) in enumerate(chunks):
         emb = embed_text(content)
@@ -159,6 +221,8 @@ def _replace_file_chunks(
             )
         )
     row.status = UploadedFileStatus.ready
+    if old_provider == "cloudinary" and old_public_id and old_public_id != row.meta.get("cloudinary_public_id"):
+        destroy_asset(old_public_id)
     if old_storage_path and old_storage_path != storage_path and old_storage_path.exists():
         old_storage_path.unlink()
 
@@ -231,7 +295,15 @@ async def upload_file(
 
     db.commit()
     return ApiResponse(
-        data=FileUploadResponse(file_id=row.id, status=row.status.value, original_name=row.original_name, size_bytes=row.size_bytes),
+        data=FileUploadResponse(
+            file_id=row.id,
+            status=row.status.value,
+            original_name=row.original_name,
+            size_bytes=row.size_bytes,
+            storage_provider=row.meta.get("storage_provider"),
+            storage_url=row.meta.get("storage_url"),
+            cloudinary_public_id=row.meta.get("cloudinary_public_id"),
+        ),
         request_id=request_id,
     )
 
@@ -270,7 +342,15 @@ async def reindex_file(
 
     db.commit()
     return ApiResponse(
-        data=FileUploadResponse(file_id=row.id, status=row.status.value, original_name=row.original_name, size_bytes=row.size_bytes),
+        data=FileUploadResponse(
+            file_id=row.id,
+            status=row.status.value,
+            original_name=row.original_name,
+            size_bytes=row.size_bytes,
+            storage_provider=row.meta.get("storage_provider"),
+            storage_url=row.meta.get("storage_url"),
+            cloudinary_public_id=row.meta.get("cloudinary_public_id"),
+        ),
         request_id=request_id,
     )
 
@@ -286,13 +366,19 @@ def delete_file(
     if not row or row.user_id != current_user.id or row.status == UploadedFileStatus.deleted:
         raise QueuelyError("file_not_found", "File not found.", status_code=404)
 
+    meta = row.meta or {}
+    storage_provider = str(meta.get("storage_provider") or "local")
     storage_path = Path(row.storage_path)
     for chunk in list(row.chunks):
         db.delete(chunk)
     row.status = UploadedFileStatus.deleted
     db.commit()
 
-    if storage_path.exists():
+    if storage_provider == "cloudinary":
+        cloudinary_public_id = meta.get("cloudinary_public_id")
+        if cloudinary_public_id:
+            destroy_asset(str(cloudinary_public_id))
+    elif storage_path.exists():
         storage_path.unlink()
 
     return ApiResponse(data=FileDeleteResponse(file_id=file_id, deleted=True), request_id=request_id)

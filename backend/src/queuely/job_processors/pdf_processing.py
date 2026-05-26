@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import statistics
+from tempfile import NamedTemporaryFile
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 import pdfplumber
@@ -13,6 +14,7 @@ import pytesseract
 
 from queuely.core.config import get_settings
 from queuely.job_processors.runtime import artifact_dir, atomic_write_json, emit_progress
+from queuely.services.cloudinary_storage import download_url
 
 
 settings = get_settings()
@@ -24,6 +26,7 @@ class PdfProcessingPayload(BaseModel):
     pages: list[str] | None = None
     text: str | None = None
     file_path: str | None = None
+    cloudinary_url: str | None = None
     page_break_marker: str = "\f"
     preview_chars: int = Field(default=500, ge=64, le=4000)
     enable_ocr: bool | None = None
@@ -31,9 +34,9 @@ class PdfProcessingPayload(BaseModel):
 
     @model_validator(mode="after")
     def validate_source(self) -> "PdfProcessingPayload":
-        sources = [bool(self.pages), bool(self.text), bool(self.file_path)]
+        sources = [bool(self.pages), bool(self.text), bool(self.file_path), bool(self.cloudinary_url)]
         if sum(sources) != 1:
-            raise ValueError("Exactly one of pages, text, or file_path must be provided.")
+            raise ValueError("Exactly one of pages, text, file_path, or cloudinary_url must be provided.")
         return self
 
 
@@ -60,6 +63,46 @@ def _resolve_allowed_pdf_path(raw_path: str) -> Path:
     if candidate.stat().st_size > settings.pdf_max_file_size_bytes:
         raise ValueError("PDF file exceeds the configured maximum size.")
     return candidate
+
+
+def _extract_pdf_pages_from_path(pdf_path: Path, payload: PdfProcessingPayload, *, source: str) -> tuple[list[PageExtraction], dict[str, object]]:
+    reader = PdfReader(str(pdf_path))
+    if len(reader.pages) > settings.pdf_max_pages:
+        raise ValueError(f"PDF exceeds the configured page limit of {settings.pdf_max_pages}.")
+
+    tables_by_page = _extract_tables(pdf_path) if (payload.enable_table_extraction if payload.enable_table_extraction is not None else settings.pdf_enable_table_extraction) else {}
+    use_ocr = payload.enable_ocr if payload.enable_ocr is not None else settings.pdf_enable_ocr
+    pages: list[PageExtraction] = []
+
+    for index, page in enumerate(reader.pages, start=1):
+        native_text = (page.extract_text() or "").strip()
+        tables = tables_by_page.get(index, [])
+        scanned = len(native_text) < settings.pdf_scan_text_threshold
+        used_ocr = False
+        page_text = native_text
+        text_source = "native"
+        if scanned and use_ocr:
+            page_text = _render_page_for_ocr(pdf_path, index)
+            used_ocr = True
+            text_source = "ocr"
+        pages.append(
+            PageExtraction(
+                page_number=index,
+                text=page_text,
+                text_source=text_source,
+                tables=tables,
+                used_ocr=used_ocr,
+            )
+        )
+
+    metadata = {
+        "source": source,
+        "file_name": pdf_path.name,
+        "page_limit": settings.pdf_max_pages,
+        "ocr_enabled": use_ocr,
+        "table_extraction_enabled": bool(tables_by_page) or (payload.enable_table_extraction if payload.enable_table_extraction is not None else settings.pdf_enable_table_extraction),
+    }
+    return pages, metadata
 
 
 def _configure_tesseract() -> str | None:
@@ -102,43 +145,20 @@ def _render_page_for_ocr(pdf_path: Path, page_number: int) -> str:
 
 def _extract_pdf_pages_from_file(payload: PdfProcessingPayload) -> tuple[list[PageExtraction], dict[str, object]]:
     pdf_path = _resolve_allowed_pdf_path(str(payload.file_path))
-    reader = PdfReader(str(pdf_path))
-    if len(reader.pages) > settings.pdf_max_pages:
-        raise ValueError(f"PDF exceeds the configured page limit of {settings.pdf_max_pages}.")
+    return _extract_pdf_pages_from_path(pdf_path, payload, source=str(pdf_path))
 
-    tables_by_page = _extract_tables(pdf_path) if (payload.enable_table_extraction if payload.enable_table_extraction is not None else settings.pdf_enable_table_extraction) else {}
-    use_ocr = payload.enable_ocr if payload.enable_ocr is not None else settings.pdf_enable_ocr
-    pages: list[PageExtraction] = []
 
-    for index, page in enumerate(reader.pages, start=1):
-        native_text = (page.extract_text() or "").strip()
-        tables = tables_by_page.get(index, [])
-        scanned = len(native_text) < settings.pdf_scan_text_threshold
-        used_ocr = False
-        page_text = native_text
-        text_source = "native"
-        if scanned and use_ocr:
-            page_text = _render_page_for_ocr(pdf_path, index)
-            used_ocr = True
-            text_source = "ocr"
-        pages.append(
-            PageExtraction(
-                page_number=index,
-                text=page_text,
-                text_source=text_source,
-                tables=tables,
-                used_ocr=used_ocr,
-            )
-        )
+def _extract_pdf_pages_from_cloudinary(payload: PdfProcessingPayload) -> tuple[list[PageExtraction], dict[str, object]]:
+    cloudinary_url = str(payload.cloudinary_url)
+    pdf_bytes = download_url(cloudinary_url)
+    if len(pdf_bytes) > settings.pdf_max_file_size_bytes:
+        raise ValueError("PDF file exceeds the configured maximum size.")
 
-    metadata = {
-        "source": str(pdf_path),
-        "file_name": pdf_path.name,
-        "page_limit": settings.pdf_max_pages,
-        "ocr_enabled": use_ocr,
-        "table_extraction_enabled": bool(tables_by_page) or (payload.enable_table_extraction if payload.enable_table_extraction is not None else settings.pdf_enable_table_extraction),
-    }
-    return pages, metadata
+    with NamedTemporaryFile("wb", suffix=".pdf", delete=True) as temp_file:
+        temp_file.write(pdf_bytes)
+        temp_file.flush()
+        temp_path = Path(temp_file.name)
+        return _extract_pdf_pages_from_path(temp_path, payload, source=cloudinary_url)
 
 
 def _extract_inline_pages(payload: PdfProcessingPayload) -> tuple[list[PageExtraction], dict[str, object]]:
@@ -155,6 +175,8 @@ def _extract_inline_pages(payload: PdfProcessingPayload) -> tuple[list[PageExtra
 def extract_pdf_content(payload: PdfProcessingPayload) -> tuple[list[PageExtraction], dict[str, object]]:
     if payload.file_path:
         return _extract_pdf_pages_from_file(payload)
+    if payload.cloudinary_url:
+        return _extract_pdf_pages_from_cloudinary(payload)
     return _extract_inline_pages(payload)
 
 

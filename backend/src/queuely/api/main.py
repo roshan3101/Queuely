@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     app.state.redis = redis_client
     app.state.ws_manager = WebSocketManager()
 
-    # Dev convenience: create/promote a superuser if SEED_SUPERUSER_* env vars are set.
+    # Dev convenience: create or refresh the seeded login if SEED_SUPERUSER_* env vars are set.
     with SessionLocal() as db:
         seed_superuser(db, settings)
 

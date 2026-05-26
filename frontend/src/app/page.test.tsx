@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { vi } from "vitest";
-import Page from "./app/page";
+import Page from "./page";
 
 vi.mock("next/navigation", () => ({
   useRouter() {
@@ -9,9 +9,9 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-describe("Dashboard page", () => {
-  it("renders the app title", () => {
+describe("Landing page", () => {
+  it("renders a loading state while redirecting", () => {
     render(<Page />);
-    expect(screen.getByText("Queuely")).toBeInTheDocument();
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 });

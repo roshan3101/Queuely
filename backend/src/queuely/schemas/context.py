@@ -56,6 +56,9 @@ class FileUploadResponse(BaseModel):
     status: str
     original_name: str
     size_bytes: int
+    storage_provider: str | None = None
+    storage_url: str | None = None
+    cloudinary_public_id: str | None = None
 
 
 class FileDeleteResponse(BaseModel):
@@ -72,6 +75,8 @@ class FileRead(BaseModel):
     size_bytes: int
     created_at: datetime
     updated_at: datetime
+    storage_provider: str | None = None
+    storage_url: str | None = None
 
 
 class FileListRead(BaseModel):

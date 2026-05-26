@@ -2,6 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { writeTokens } from "../../lib/authStorage";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -43,36 +48,34 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#02060b] px-4 text-zinc-100">
-      <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-cyan-950/10 backdrop-blur">
-        <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300/80">Queuely</div>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">Create account</h1>
-        <p className="mt-1 text-sm text-zinc-400">Sign up and you’ll be logged in automatically.</p>
-
-        <div className="mt-5 grid gap-3">
-          <label className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-            <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">Email</span>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600" placeholder="you@example.com" />
-          </label>
-          <label className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-            <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">Password</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600" placeholder="min 8 chars" />
-          </label>
-          <label className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-            <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">Full name (optional)</span>
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600" placeholder="Your name" />
-          </label>
-          {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{error}</div> : null}
-
-          <div className="flex items-center justify-between gap-3">
-            <a href="/login" className="text-sm text-zinc-300 underline decoration-white/20 underline-offset-4 hover:text-white">
-              Back to login
-            </a>
-            <button onClick={() => void submit()} disabled={!canSubmit || busy} className="h-11 rounded-2xl bg-cyan-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">
-              {busy ? "Creating…" : "Create account"}
-            </button>
-          </div>
-        </div>
+    <main className="min-h-screen bg-[#02060b] px-4 text-zinc-100">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center py-10">
+        <Card className="w-full max-w-lg border-white/10 bg-white/5 shadow-2xl shadow-cyan-950/10">
+          <CardHeader>
+            <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300/80">Queuely</div>
+            <CardTitle>Create account</CardTitle>
+            <CardDescription>Sign up and you’ll be logged in automatically.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="min 8 chars" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="fullName">Full name (optional)</Label>
+              <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
+            </div>
+            {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{error}</div> : null}
+            <div className="flex items-center justify-between gap-3">
+              <Link href="/login" className="text-sm text-zinc-300 underline decoration-white/20 underline-offset-4 hover:text-white">Back to login</Link>
+              <Button onClick={() => void submit()} disabled={!canSubmit || busy}>{busy ? "Creating..." : "Create account"}</Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </main>
   );

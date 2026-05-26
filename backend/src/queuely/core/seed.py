@@ -28,21 +28,24 @@ def seed_superuser(db: Session, settings: Settings) -> None:
             password_hash=hash_password(password),
             full_name=full_name,
             is_active=True,
-            is_superuser=True,
+            is_superuser=False,
         )
         db.add(user)
         db.commit()
-        logger.info("seeded_superuser email=%s created=true", email)
+        logger.info("seeded_user email=%s created=true", email)
         return
 
     changed = False
-    if not user.is_superuser:
-        user.is_superuser = True
+    desired_password_hash = hash_password(password)
+    if user.password_hash != desired_password_hash:
+        user.password_hash = desired_password_hash
+        changed = True
+    if user.is_superuser:
+        user.is_superuser = False
         changed = True
     if not user.is_active:
         user.is_active = True
         changed = True
     if changed:
         db.commit()
-        logger.info("seeded_superuser email=%s promoted=true", email)
-
+        logger.info("seeded_user email=%s updated=true", email)

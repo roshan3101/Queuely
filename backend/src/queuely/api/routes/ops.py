@@ -7,7 +7,7 @@ from redis.asyncio import Redis
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from queuely.api.auth import require_superuser
+from queuely.api.auth import require_active_user
 from queuely.api.dependencies import get_db_session, get_redis, get_request_id
 from queuely.core.responses import ApiResponse
 from queuely.core.exceptions import QueuelyError
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 @router.get("/queues", response_model=ApiResponse[QueuesRead])
 async def queues(
     redis_client: Redis = Depends(get_redis),
-    current_user: object = Depends(require_superuser),
+    current_user: object = Depends(require_active_user),
     request_id: str | None = Depends(get_request_id),
 ) -> ApiResponse[QueuesRead]:
     queue_names = sorted(set(JOB_QUEUE_MAP.values()) | {"jobs.dlq"})
@@ -53,7 +53,7 @@ async def queues(
 @router.get("/rate-limits", response_model=ApiResponse[RateLimitBucketsRead])
 def rate_limits(
     session: Session = Depends(get_db_session),
-    current_user: object = Depends(require_superuser),
+    current_user: object = Depends(require_active_user),
     request_id: str | None = Depends(get_request_id),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
@@ -91,7 +91,7 @@ def rate_limits(
 @router.get("/workers", response_model=ApiResponse[WorkersRead])
 def workers(
     session: Session = Depends(get_db_session),
-    current_user: object = Depends(require_superuser),
+    current_user: object = Depends(require_active_user),
     request_id: str | None = Depends(get_request_id),
     healthy_within_seconds: int = Query(default=60, ge=5, le=3600),
 ) -> ApiResponse[WorkersRead]:
@@ -118,7 +118,7 @@ def workers(
 @router.get("/jobs/dead-lettered", response_model=ApiResponse[DeadLetterJobsRead])
 def dead_lettered_jobs(
     session: Session = Depends(get_db_session),
-    current_user: object = Depends(require_superuser),
+    current_user: object = Depends(require_active_user),
     request_id: str | None = Depends(get_request_id),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -138,7 +138,7 @@ def dead_lettered_jobs(
 @router.get("/jobs", response_model=ApiResponse[JobListResponse])
 def list_jobs(
     session: Session = Depends(get_db_session),
-    current_user: object = Depends(require_superuser),
+    current_user: object = Depends(require_active_user),
     request_id: str | None = Depends(get_request_id),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -170,7 +170,7 @@ def list_jobs(
 def get_job(
     job_id: str,
     session: Session = Depends(get_db_session),
-    current_user: object = Depends(require_superuser),
+    current_user: object = Depends(require_active_user),
     request_id: str | None = Depends(get_request_id),
 ) -> ApiResponse[JobRead]:
     stmt = select(Job).where(Job.id == job_id).options(selectinload(Job.events))
@@ -184,7 +184,7 @@ def get_job(
 def requeue_dead_lettered_job(
     job_id: str,
     session: Session = Depends(get_db_session),
-    current_user = Depends(require_superuser),
+    current_user = Depends(require_active_user),
     request_id: str | None = Depends(get_request_id),
 ) -> ApiResponse[RequeueResponse]:
     job = session.get(Job, job_id)

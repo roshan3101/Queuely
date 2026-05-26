@@ -50,7 +50,7 @@ export function shortId(value: string): string {
 export function MessageBody({ content }: { content: string }) {
   const sections = content.split(/```([\s\S]*?)```/g);
   return (
-    <div className="space-y-3 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-200">
+    <div className="space-y-3 whitespace-pre-wrap wrap-break-word text-sm leading-7 text-zinc-200">
       {sections.map((section, index) => {
         if (index % 2 === 0) {
           return <p key={index}>{section}</p>;

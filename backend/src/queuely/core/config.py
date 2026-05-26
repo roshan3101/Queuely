@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
     smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
     smtp_from_email: str | None = Field(default=None, alias="SMTP_FROM_EMAIL")
+    cloudinary_cloud_name: str | None = Field(default=None, alias="CLOUDINARY_CLOUD_NAME")
+    cloudinary_api_key: str | None = Field(default=None, alias="CLOUDINARY_API_KEY")
+    cloudinary_api_secret: str | None = Field(default=None, alias="CLOUDINARY_API_SECRET")
+    cloudinary_folder: str = Field(default="queuely/uploads", alias="CLOUDINARY_FOLDER")
     pdf_max_pages: int = Field(default=100, alias="PDF_MAX_PAGES")
     pdf_max_file_size_bytes: int = Field(default=25 * 1024 * 1024, alias="PDF_MAX_FILE_SIZE_BYTES")
     pdf_allowed_roots_raw: str = Field(default="backend/storage/uploads,.", alias="PDF_ALLOWED_ROOTS")
@@ -70,7 +74,7 @@ class Settings(BaseSettings):
     pdf_scan_text_threshold: int = Field(default=24, alias="PDF_SCAN_TEXT_THRESHOLD")
     tesseract_cmd: str | None = Field(default=None, alias="TESSERACT_CMD")
 
-    # Local/dev convenience: create (or promote) an initial superuser at startup.
+    # Local/dev convenience: create or refresh the initial seeded login at startup.
     seed_superuser_email: str | None = Field(default=None, alias="SEED_SUPERUSER_EMAIL")
     seed_superuser_password: str | None = Field(default=None, alias="SEED_SUPERUSER_PASSWORD")
     seed_superuser_full_name: str | None = Field(default=None, alias="SEED_SUPERUSER_FULL_NAME")

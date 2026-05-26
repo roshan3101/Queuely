@@ -27,7 +27,7 @@ export default function OpsPanel({ queues, workers, deadLetters, opsJobs, requeu
                   <span className="font-mono text-cyan-200">{queue.depth}</span>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-500" style={{ width: `${Math.min(100, queue.depth * 12)}%` }} />
+                  <div className="h-full rounded-full bg-linear-to-r from-cyan-400 to-sky-500" style={{ width: `${Math.min(100, queue.depth * 12)}%` }} />
                 </div>
               </div>
             ))}

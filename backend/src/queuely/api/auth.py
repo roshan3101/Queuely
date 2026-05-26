@@ -44,6 +44,4 @@ def require_active_user(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_superuser(current_user: User = Depends(require_active_user)) -> User:
-    if not current_user.is_superuser:
-        raise QueuelyError("forbidden", "Superuser access is required.", 403)
     return current_user

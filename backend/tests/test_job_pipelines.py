@@ -7,6 +7,7 @@ import pytest
 
 from queuely.job_processors import email_delivery, pdf_processing, report_generation
 from queuely.job_processors.report_llm import StructuredReport
+from queuely.services import cloudinary_storage
 
 
 def _workspace_tmp(name: str) -> Path:
@@ -39,6 +40,44 @@ def test_pdf_rejects_outside_allowed_roots() -> None:
     payload = pdf_processing.parse_pdf_payload({"file_path": str(fake_pdf)})
     with pytest.raises(ValueError):
         pdf_processing.extract_pdf_content(payload)
+
+
+def test_extract_pdf_content_from_cloudinary_url(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    def _download(url: str) -> bytes:
+        seen["url"] = url
+        return b"%PDF-1.4 fake-bytes"
+
+    def _extract(pdf_path: Path, payload: pdf_processing.PdfProcessingPayload, *, source: str):
+        seen["path"] = pdf_path
+        seen["source"] = source
+        seen["payload"] = payload
+        return ([pdf_processing.PageExtraction(page_number=1, text="Cloudinary text", text_source="cloudinary", tables=[], used_ocr=False)], {"source": source})
+
+    monkeypatch.setattr(pdf_processing, "download_url", _download)
+    monkeypatch.setattr(pdf_processing, "_extract_pdf_pages_from_path", _extract)
+
+    payload = pdf_processing.parse_pdf_payload({"cloudinary_url": "https://res.cloudinary.com/demo/raw/upload/sample.pdf"})
+    pages, metadata = pdf_processing.extract_pdf_content(payload)
+
+    assert pages[0].text == "Cloudinary text"
+    assert metadata["source"] == "https://res.cloudinary.com/demo/raw/upload/sample.pdf"
+    assert seen["url"] == "https://res.cloudinary.com/demo/raw/upload/sample.pdf"
+
+
+def test_cloudinary_upload_helper_wraps_sdk(monkeypatch) -> None:
+    monkeypatch.setattr(cloudinary_storage, "is_configured", lambda: True)
+    monkeypatch.setattr(cloudinary_storage, "configure_cloudinary", lambda: None)
+    monkeypatch.setattr(
+        cloudinary_storage.cloudinary.uploader,
+        "upload",
+        lambda file, **options: {"public_id": "demo/public-id", "secure_url": "https://res.cloudinary.com/demo/raw/upload/sample.pdf", "bytes": 123, "format": "pdf"},
+    )
+    asset = cloudinary_storage.upload_bytes(b"pdf-bytes", filename="sample.pdf", folder="queuely/uploads", resource_type="raw")
+    assert asset is not None
+    assert asset.public_id == "demo/public-id"
+    assert asset.secure_url.endswith("sample.pdf")
 
 
 def test_generate_report_document_writes_markdown(monkeypatch) -> None:
