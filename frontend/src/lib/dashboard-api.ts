@@ -80,4 +80,16 @@ export const dashboardApi = {
     apiFetch<ApiResponse<{ items: JobRecord[]; total: number; limit: number; offset: number }>>(API_BASE, tokenState, setTokenState, "/tasks?limit=100&offset=0").then((response) => response.data),
   listRateLimits: (tokenState: TokenState, setTokenState: (next: TokenState) => void) =>
     apiFetch<ApiResponse<{ items: RateLimitBucketRecord[]; total: number; limit: number; offset: number }>>(API_BASE, tokenState, setTokenState, "/ops/rate-limits?limit=50&offset=0").then((response) => response.data),
+  cancelJob: (tokenState: TokenState, setTokenState: (next: TokenState) => void, jobId: string) =>
+    apiFetch<ApiResponse<{ status: string; job_id: string }>>(API_BASE, tokenState, setTokenState, `/tasks/${jobId}/cancel`, {
+      method: "POST",
+    }).then((response) => response.data),
+  requeueJob: (tokenState: TokenState, setTokenState: (next: TokenState) => void, jobId: string) =>
+    apiFetch<ApiResponse<{ status: string; job_id: string }>>(API_BASE, tokenState, setTokenState, `/ops/jobs/${jobId}/requeue`, {
+      method: "POST",
+    }).then((response) => response.data),
+  cancelMessageStream: (tokenState: TokenState, setTokenState: (next: TokenState) => void, sessionId: string, messageId: string) =>
+    apiFetch<ApiResponse<{ status: string }>>(API_BASE, tokenState, setTokenState, `/sessions/${sessionId}/messages/${messageId}/cancel`, {
+      method: "POST",
+    }).then((response) => response.data),
 };

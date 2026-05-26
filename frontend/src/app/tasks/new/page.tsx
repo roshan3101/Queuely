@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { readTokens, type TokenState } from "@/lib/authStorage";
 import { dashboardApi } from "@/lib/dashboard-api";
-import type { FileRecord, JobRecord } from "@/lib/dashboard-types";
+import type { JobRecord } from "@/lib/dashboard-types";
 import { useToast } from "@/components/ui/use-toast";
+import { ArrowRight, ArrowLeft, Terminal, ShieldAlert, CheckCircle } from "lucide-react";
 
 type JobType = "pdf_processing" | "report_generation" | "email_sending";
 
@@ -30,6 +31,8 @@ type TaskDraft = {
   emailBody: string;
   emailHtml: string;
   emailDryRun: boolean;
+  priority: number;
+  maxRetries: number;
 };
 
 type TaskArtifact = {
@@ -52,39 +55,35 @@ function parseReportSections(rawSections: string) {
   });
 }
 
-function formatResult(result: JobRecord["result"]) {
-  if (!result) return "No result yet.";
-  try {
-    return JSON.stringify(result, null, 2);
-  } catch {
-    return String(result);
-  }
-}
-
 export default function TaskLauncherPage() {
   const [tokenState, setTokenState] = useState<TokenState>({ accessToken: "", refreshToken: "" });
   const [ready, setReady] = useState(false);
-  const [files, setFiles] = useState<FileRecord[]>([]);
   const [jobs, setJobs] = useState<JobRecord[]>([]);
-  const [selectedFileId, setSelectedFileId] = useState("");
   const [uploadedArtifact, setUploadedArtifact] = useState<TaskArtifact | null>(null);
+  
+  // Wizard state: Step 1, 2, 3
+  const [step, setStep] = useState(1);
+
   const [taskDraft, setTaskDraft] = useState<TaskDraft>({
     jobType: "pdf_processing",
     pdfPreviewChars: "500",
     pdfEnableOcr: true,
     pdfEnableTables: true,
-    reportTitle: "Task report",
+    reportTitle: "Infrastructure Audit",
     reportFormat: "md",
     reportProvider: "gemini",
     reportProviderModel: "",
     reportSummary: "",
-    reportSections: "Overview\n\nFindings",
+    reportSections: "Overview\n\nFindings\nAll services operational.",
     emailTo: "",
-    emailSubject: "Task update",
-    emailBody: "",
+    emailSubject: "Durable Queue Delivery Updates",
+    emailBody: "Task processing completed.",
     emailHtml: "",
     emailDryRun: true,
+    priority: 5,
+    maxRetries: 5,
   });
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [taskMessage, setTaskMessage] = useState<string | null>(null);
@@ -96,33 +95,59 @@ export default function TaskLauncherPage() {
     setReady(true);
   }, []);
 
+  const refresh = () => {
+    if (!ready || !tokenState.accessToken) return;
+    void dashboardApi.listJobs(tokenState, setTokenState).then((data) => setJobs(data.items)).catch(() => void 0);
+  };
+
   useEffect(() => {
     if (!ready || !tokenState.accessToken) return;
-
-    const refresh = () => {
-      void Promise.all([
-        dashboardApi.listFiles(tokenState, setTokenState).then((data) => setFiles(data.items)).catch(() => void 0),
-        dashboardApi.listJobs(tokenState, setTokenState).then((data) => setJobs(data.items)).catch(() => void 0),
-      ]);
-    };
-
     refresh();
     const timer = window.setInterval(refresh, 5000);
     return () => window.clearInterval(timer);
   }, [ready, tokenState]);
 
-  const activeFile = useMemo(() => {
-    if (selectedFileId) {
-      return files.find((file) => file.id === selectedFileId) ?? null;
-    }
-    if (uploadedArtifact) {
-      return files.find((file) => file.id === uploadedArtifact.file_id) ?? null;
-    }
-    return null;
-  }, [files, selectedFileId, uploadedArtifact]);
-
-  const recentJobs = useMemo(() => jobs.slice(0, 8), [jobs]);
+  const recentJobs = useMemo(() => jobs.slice(0, 6), [jobs]);
   const latestResultJob = useMemo(() => jobs.find((job) => job.result) ?? submittedJob ?? null, [jobs, submittedJob]);
+
+  // Compute final payload dynamic preview
+  const payloadPreview = useMemo(() => {
+    if (taskDraft.jobType === "pdf_processing") {
+      return {
+        cloudinary_url: uploadedArtifact?.storage_url || "UPLOADING_REQUIRED...",
+        preview_chars: Number(taskDraft.pdfPreviewChars) || 500,
+        enable_ocr: taskDraft.pdfEnableOcr,
+        enable_table_extraction: taskDraft.pdfEnableTables,
+        metadata: {
+          file_id: uploadedArtifact?.file_id ?? null,
+          original_name: uploadedArtifact?.original_name ?? null,
+        },
+      };
+    } else if (taskDraft.jobType === "report_generation") {
+      return {
+        title: taskDraft.reportTitle.trim(),
+        format: taskDraft.reportFormat,
+        provider: taskDraft.reportProvider,
+        provider_model: taskDraft.reportProviderModel.trim() || null,
+        summary: taskDraft.reportSummary.trim() || null,
+        sections: parseReportSections(taskDraft.reportSections),
+        metadata: {
+          file_id: uploadedArtifact?.file_id ?? null,
+        },
+      };
+    } else {
+      return {
+        to: taskDraft.emailTo.split(/[\n,]/).map((r) => r.trim()).filter(Boolean),
+        subject: taskDraft.emailSubject.trim(),
+        body: taskDraft.emailBody.trim(),
+        html: taskDraft.emailHtml.trim() || null,
+        dry_run: taskDraft.emailDryRun,
+        metadata: {
+          file_id: uploadedArtifact?.file_id ?? null,
+        },
+      };
+    }
+  }, [taskDraft, uploadedArtifact]);
 
   async function uploadTaskFile(file: File) {
     setBusy(true);
@@ -136,11 +161,8 @@ export default function TaskLauncherPage() {
         storage_provider: uploaded.storage_provider,
         storage_url: uploaded.storage_url,
       });
-      setSelectedFileId(uploaded.file_id);
-      const refreshed = await dashboardApi.listFiles(tokenState, setTokenState);
-      setFiles(refreshed.items);
-      setTaskMessage(`Uploaded ${uploaded.original_name}.`);
-      toast({ title: "File uploaded", description: `${uploaded.original_name} is ready for a task.`, variant: "success" });
+      setTaskMessage(`Context file loaded: ${uploaded.original_name}.`);
+      toast({ title: "File loaded", description: `${uploaded.original_name} is active.`, variant: "success" });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to upload file";
       setError(message);
@@ -157,206 +179,357 @@ export default function TaskLauncherPage() {
     setTaskMessage(null);
 
     try {
-      if (taskDraft.jobType === "pdf_processing") {
-        const sourceFile = activeFile ?? uploadedArtifact;
-        if (!sourceFile?.storage_url) {
-          const message = "Upload or choose a file before launching PDF processing.";
-          toast({ title: "File required", description: message, variant: "warning" });
-          throw new Error(message);
-        }
-        const sourceFileId = "file_id" in sourceFile ? sourceFile.file_id : sourceFile.id;
-
-        const created = await dashboardApi.createJob(tokenState, setTokenState, "pdf_processing", {
-          cloudinary_url: sourceFile.storage_url,
-          preview_chars: Number(taskDraft.pdfPreviewChars) || 500,
-          enable_ocr: taskDraft.pdfEnableOcr,
-          enable_table_extraction: taskDraft.pdfEnableTables,
-          metadata: {
-            file_id: sourceFileId,
-            original_name: sourceFile.original_name,
-          },
-        });
-        setSubmittedJob(created);
-        setTaskMessage("PDF processing task started.");
-        toast({ title: "Task started", description: `PDF processing submitted as ${created.id}.`, variant: "success" });
-      } else if (taskDraft.jobType === "report_generation") {
-        const created = await dashboardApi.createJob(tokenState, setTokenState, "report_generation", {
-          title: taskDraft.reportTitle.trim() || "Task report",
-          format: taskDraft.reportFormat,
-          provider: taskDraft.reportProvider,
-          provider_model: taskDraft.reportProviderModel.trim() || null,
-          summary: taskDraft.reportSummary.trim() || null,
-          sections: parseReportSections(taskDraft.reportSections),
-          metadata: {
-            file_id: activeFile?.id ?? uploadedArtifact?.file_id ?? null,
-          },
-        });
-        setSubmittedJob(created);
-        setTaskMessage("Report generation task started with Gemini as the default provider.");
-        toast({ title: "Task started", description: `Report generation submitted as ${created.id}.`, variant: "info" });
-      } else {
-        const created = await dashboardApi.createJob(tokenState, setTokenState, "email_sending", {
-          to: taskDraft.emailTo
-            .split(/[\n,]/)
-            .map((recipient) => recipient.trim())
-            .filter(Boolean),
-          subject: taskDraft.emailSubject.trim() || "Task update",
-          body: taskDraft.emailBody.trim(),
-          html: taskDraft.emailHtml.trim() || null,
-          dry_run: taskDraft.emailDryRun,
-          metadata: {
-            file_id: activeFile?.id ?? uploadedArtifact?.file_id ?? null,
-          },
-        });
-        setSubmittedJob(created);
-        setTaskMessage("Email task started.");
-        toast({ title: "Task started", description: `Email sending submitted as ${created.id}.`, variant: "success" });
+      if (taskDraft.jobType === "pdf_processing" && !uploadedArtifact) {
+        throw new Error("PDF processing requires an uploaded context file. Go back to Step 1.");
       }
 
-      const refreshed = await dashboardApi.listJobs(tokenState, setTokenState);
-      setJobs(refreshed.items);
+      const created = await dashboardApi.createJob(
+        tokenState,
+        setTokenState,
+        taskDraft.jobType,
+        payloadPreview,
+        {
+          priority: taskDraft.priority,
+          maxRetries: taskDraft.maxRetries,
+        }
+      );
+
+      setSubmittedJob(created);
+      setTaskMessage(`Task deployed under UUID: ${created.id}`);
+      toast({ title: "Task dispatched", description: `Task run queued as ${created.id.slice(0, 8)}.`, variant: "success" });
+      setStep(1); // Reset wizard
+      refresh();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to submit task";
       setError(message);
-      toast({ title: "Task submission failed", description: message, variant: "error" });
+      toast({ title: "Dispatch failed", description: message, variant: "error" });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>Task launcher</CardTitle>
-          <CardDescription>Upload a file, choose a task, and run it directly.</CardDescription>
+    <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
+        <CardHeader className="border-b border-zinc-800/60">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="font-mono text-sm uppercase tracking-wider">Task Deployer Wizard</CardTitle>
+              <CardDescription className="text-zinc-500">Configure and execute containerized celery tasks.</CardDescription>
+            </div>
+            <span className="font-mono text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded">
+              STEP {step} / 3
+            </span>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mt-4 flex h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
+            <div className="bg-white transition-all duration-300" style={{ width: `${(step / 3) * 100}%` }} />
+          </div>
         </CardHeader>
-        <CardContent className="grid gap-4">
-          <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-            <Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Task type</Label>
-            <select value={taskDraft.jobType} onChange={(event) => setTaskDraft((current) => ({ ...current, jobType: event.target.value as JobType }))} className="w-full bg-transparent text-sm outline-none">
-              <option value="pdf_processing">pdf_processing</option>
-              <option value="report_generation">report_generation</option>
-              <option value="email_sending">email_sending</option>
-            </select>
-          </label>
+        <CardContent className="pt-6">
+          
+          {/* STEP 1: INITIAL SELECTION & CONTEXT FILE */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Select Task Blueprint</Label>
+                <select
+                  value={taskDraft.jobType}
+                  onChange={(event) => setTaskDraft((current) => ({ ...current, jobType: event.target.value as JobType }))}
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm font-mono text-white outline-none focus:border-zinc-500"
+                >
+                  <option value="pdf_processing">PDF Processing & OCR Sandbox</option>
+                  <option value="report_generation">Semantic LLM Report Engine</option>
+                  <option value="email_sending">Distributed SMTP Delivery Engine</option>
+                </select>
+              </div>
 
-          <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-            <Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Upload file</Label>
-            <Input type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadTaskFile(file); }} className="border-white/10 bg-black/10" />
-            <p className="text-xs text-zinc-500">Uploaded files can be reused by future tasks.</p>
-          </label>
+              <div className="space-y-2">
+                <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Upload Context File (Optional)</Label>
+                <div className="rounded-lg border border-dashed border-zinc-800 bg-zinc-900/30 p-4 text-center">
+                  <Input
+                    type="file"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void uploadTaskFile(file);
+                    }}
+                    className="border-zinc-800 bg-zinc-900 cursor-pointer text-zinc-400"
+                  />
+                  <p className="mt-2 text-xs text-zinc-500 font-mono">
+                    {uploadedArtifact ? `ACTIVE: ${uploadedArtifact.original_name}` : "DRAG FILES OR BROWSE LOCAL DIRECTORIES"}
+                  </p>
+                </div>
+              </div>
 
-          <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-            <Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Selected file</Label>
-            <select value={selectedFileId} onChange={(event) => setSelectedFileId(event.target.value)} className="w-full bg-transparent text-sm outline-none">
-              <option value="">Use the uploaded file or pick one from the list</option>
-              {files.map((file) => (
-                <option key={file.id} value={file.id}>
-                  {file.original_name} {file.storage_provider ? `(${file.storage_provider})` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {taskDraft.jobType === "pdf_processing" ? (
-            <div className="space-y-3">
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Preview chars</Label>
-                <Input value={taskDraft.pdfPreviewChars} onChange={(event) => setTaskDraft((current) => ({ ...current, pdfPreviewChars: event.target.value }))} inputMode="numeric" className="border-white/10 bg-black/10" />
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200"><input type="checkbox" checked={taskDraft.pdfEnableOcr} onChange={(event) => setTaskDraft((current) => ({ ...current, pdfEnableOcr: event.target.checked }))} /> OCR fallback</label>
-                <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200"><input type="checkbox" checked={taskDraft.pdfEnableTables} onChange={(event) => setTaskDraft((current) => ({ ...current, pdfEnableTables: event.target.checked }))} /> Extract tables</label>
+              <div className="flex justify-end pt-4">
+                <Button
+                  onClick={() => setStep(2)}
+                  className="font-mono text-xs uppercase tracking-wider bg-white text-black hover:bg-zinc-200"
+                >
+                  Configure Inputs <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
-          ) : null}
+          )}
 
-          {taskDraft.jobType === "report_generation" ? (
-            <div className="space-y-3">
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Title</Label>
-                <Input value={taskDraft.reportTitle} onChange={(event) => setTaskDraft((current) => ({ ...current, reportTitle: event.target.value }))} className="border-white/10 bg-black/10" />
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                  <Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Format</Label>
-                  <select value={taskDraft.reportFormat} onChange={(event) => setTaskDraft((current) => ({ ...current, reportFormat: event.target.value as TaskDraft["reportFormat"] }))} className="w-full bg-transparent text-sm outline-none">
-                    <option value="json">json</option><option value="md">md</option><option value="txt">txt</option>
-                  </select>
-                </label>
-                <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                  <Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Provider</Label>
-                  <select value={taskDraft.reportProvider} onChange={(event) => setTaskDraft((current) => ({ ...current, reportProvider: event.target.value as TaskDraft["reportProvider"] }))} className="w-full bg-transparent text-sm outline-none">
-                    <option value="template">template</option><option value="openai">openai</option><option value="gemini">gemini</option>
-                  </select>
-                </label>
+          {/* STEP 2: DYNAMIC PAYLOAD SETTINGS */}
+          {step === 2 && (
+            <div className="space-y-6">
+              {taskDraft.jobType === "pdf_processing" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Preview Character Budget</Label>
+                    <Input
+                      value={taskDraft.pdfPreviewChars}
+                      onChange={(event) => setTaskDraft((current) => ({ ...current, pdfPreviewChars: event.target.value }))}
+                      inputMode="numeric"
+                      className="border-zinc-800 bg-zinc-900 font-mono text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <label className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 text-xs font-mono text-zinc-300 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={taskDraft.pdfEnableOcr}
+                        onChange={(event) => setTaskDraft((current) => ({ ...current, pdfEnableOcr: event.target.checked }))}
+                        className="rounded border-zinc-800 accent-white"
+                      />
+                      OCR FALLBACK
+                    </label>
+                    <label className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 text-xs font-mono text-zinc-300 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={taskDraft.pdfEnableTables}
+                        onChange={(event) => setTaskDraft((current) => ({ ...current, pdfEnableTables: event.target.checked }))}
+                        className="rounded border-zinc-800 accent-white"
+                      />
+                      EXTRACT TABLES
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {taskDraft.jobType === "report_generation" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Format</Label>
+                      <select
+                        value={taskDraft.reportFormat}
+                        onChange={(event) => setTaskDraft((current) => ({ ...current, reportFormat: event.target.value as TaskDraft["reportFormat"] }))}
+                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-sm font-mono text-white outline-none"
+                      >
+                        <option value="json">JSON</option>
+                        <option value="md">Markdown</option>
+                        <option value="txt">Plain Text</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">LLM Provider</Label>
+                      <select
+                        value={taskDraft.reportProvider}
+                        onChange={(event) => setTaskDraft((current) => ({ ...current, reportProvider: event.target.value as TaskDraft["reportProvider"] }))}
+                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-sm font-mono text-white outline-none"
+                      >
+                        <option value="template">Template Built-in</option>
+                        <option value="openai">OpenAI GPT-4</option>
+                        <option value="gemini">Google Gemini 1.5</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Title</Label>
+                    <Input
+                      value={taskDraft.reportTitle}
+                      onChange={(event) => setTaskDraft((current) => ({ ...current, reportTitle: event.target.value }))}
+                      className="border-zinc-800 bg-zinc-900 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Report Outline & Sections</Label>
+                    <Textarea
+                      value={taskDraft.reportSections}
+                      onChange={(event) => setTaskDraft((current) => ({ ...current, reportSections: event.target.value }))}
+                      rows={4}
+                      className="border-zinc-800 bg-zinc-900 text-xs font-mono"
+                      placeholder="Use paragraph blocks for sections"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {taskDraft.jobType === "email_sending" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Recipient SMTP Address</Label>
+                    <Input
+                      value={taskDraft.emailTo}
+                      onChange={(event) => setTaskDraft((current) => ({ ...current, emailTo: event.target.value }))}
+                      className="border-zinc-800 bg-zinc-900 text-sm font-mono"
+                      placeholder="operator@queuely.internal"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Subject</Label>
+                    <Input
+                      value={taskDraft.emailSubject}
+                      onChange={(event) => setTaskDraft((current) => ({ ...current, emailSubject: event.target.value }))}
+                      className="border-zinc-800 bg-zinc-900 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Body</Label>
+                    <Textarea
+                      value={taskDraft.emailBody}
+                      onChange={(event) => setTaskDraft((current) => ({ ...current, emailBody: event.target.value }))}
+                      rows={3}
+                      className="border-zinc-800 bg-zinc-900 text-xs font-mono"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 text-xs font-mono text-zinc-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={taskDraft.emailDryRun}
+                      onChange={(event) => setTaskDraft((current) => ({ ...current, emailDryRun: event.target.checked }))}
+                      className="rounded border-zinc-800 accent-white"
+                    />
+                    FORCE DRY-RUN SMTP METRIC MOCK
+                  </label>
+                </div>
+              )}
+
+              <div className="flex justify-between pt-4 border-t border-zinc-800/60">
+                <Button
+                  onClick={() => setStep(1)}
+                  variant="outline"
+                  className="font-mono text-xs uppercase tracking-wider border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+                >
+                  <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
+                </Button>
+                <Button
+                  onClick={() => setStep(3)}
+                  className="font-mono text-xs uppercase tracking-wider bg-white text-black hover:bg-zinc-200"
+                >
+                  Review Settings <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
               </div>
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Provider model</Label><Input value={taskDraft.reportProviderModel} onChange={(event) => setTaskDraft((current) => ({ ...current, reportProviderModel: event.target.value }))} className="border-white/10 bg-black/10" placeholder="Optional override" /></label>
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Summary</Label><Textarea value={taskDraft.reportSummary} onChange={(event) => setTaskDraft((current) => ({ ...current, reportSummary: event.target.value }))} rows={3} className="border-white/10 bg-black/10" placeholder="Short executive summary" /></label>
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Sections</Label><Textarea value={taskDraft.reportSections} onChange={(event) => setTaskDraft((current) => ({ ...current, reportSections: event.target.value }))} rows={6} className="border-white/10 bg-black/10" placeholder={"Overview\n\nFindings"} /></label>
             </div>
-          ) : null}
+          )}
 
-          {taskDraft.jobType === "email_sending" ? (
-            <div className="space-y-3">
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">To</Label><Input value={taskDraft.emailTo} onChange={(event) => setTaskDraft((current) => ({ ...current, emailTo: event.target.value }))} className="border-white/10 bg-black/10" placeholder="user@example.com" /></label>
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Subject</Label><Input value={taskDraft.emailSubject} onChange={(event) => setTaskDraft((current) => ({ ...current, emailSubject: event.target.value }))} className="border-white/10 bg-black/10" placeholder="Task update" /></label>
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Body</Label><Textarea value={taskDraft.emailBody} onChange={(event) => setTaskDraft((current) => ({ ...current, emailBody: event.target.value }))} rows={4} className="border-white/10 bg-black/10" placeholder="Plain text message" /></label>
-              <label className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><Label className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">HTML</Label><Textarea value={taskDraft.emailHtml} onChange={(event) => setTaskDraft((current) => ({ ...current, emailHtml: event.target.value }))} rows={4} className="border-white/10 bg-black/10" placeholder="<p><strong>Status</strong> update</p>" /></label>
-              <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200"><input type="checkbox" checked={taskDraft.emailDryRun} onChange={(event) => setTaskDraft((current) => ({ ...current, emailDryRun: event.target.checked }))} /> Force dry-run artifact</label>
+          {/* STEP 3: PLATFORM SETTINGS & DEPLOY REVIEW */}
+          {step === 3 && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Priority Weight (1-9)</Label>
+                  <select
+                    value={taskDraft.priority}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, priority: Number(event.target.value) }))}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-sm font-mono text-white outline-none"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((p) => (
+                      <option key={p} value={p}>{p} {p === 5 ? "(Normal)" : p > 5 ? "(High)" : "(Low)"}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Max Retries</Label>
+                  <Input
+                    type="number"
+                    value={taskDraft.maxRetries}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, maxRetries: Number(event.target.value) || 3 }))}
+                    className="border-zinc-800 bg-zinc-900 font-mono text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* JSON payload compiler overview */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-zinc-500">
+                  <Terminal className="h-3.5 w-3.5" /> Payload JSON Compilation
+                </div>
+                <pre className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-[10px] font-mono leading-relaxed text-zinc-400">
+                  {JSON.stringify(payloadPreview, null, 2)}
+                </pre>
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-zinc-800/60">
+                <Button
+                  onClick={() => setStep(2)}
+                  variant="outline"
+                  className="font-mono text-xs uppercase tracking-wider border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+                >
+                  <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
+                </Button>
+                <Button
+                  onClick={() => void submitTask()}
+                  disabled={busy}
+                  className="font-mono text-xs uppercase tracking-wider bg-white text-black hover:bg-zinc-200"
+                >
+                  {busy ? "Deploying..." : "Deploy Blueprint Task"}
+                </Button>
+              </div>
             </div>
-          ) : null}
+          )}
 
-          {activeFile ? <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-50">Using {activeFile.original_name} from {activeFile.storage_provider ?? "session storage"}.</div> : null}
-          {taskMessage ? <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">{taskMessage}</div> : null}
-          {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div> : null}
-
-          <Button onClick={() => void submitTask()} disabled={!ready || busy} className="w-full">{busy ? "Submitting..." : "Start task"}</Button>
         </CardContent>
       </Card>
 
-      <div className="space-y-5">
-        <Card>
-          <CardHeader>
-            <CardTitle>Latest result</CardTitle>
-            <CardDescription>The most recent submitted job and any result it has produced so far.</CardDescription>
+      {/* SIDE TIMELINES */}
+      <div className="space-y-6">
+        <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
+          <CardHeader className="pb-3 border-b border-zinc-800/60">
+            <CardTitle className="font-mono text-xs uppercase tracking-wider text-zinc-400">Result Console</CardTitle>
+            <CardDescription className="text-zinc-500">Output verification from Celery containers.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="pt-4 space-y-4">
             {latestResultJob ? (
               <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{latestResultJob.job_type}</Badge>
-                  <Badge variant={latestResultJob.status === "dead_lettered" ? "destructive" : "secondary"}>{latestResultJob.status}</Badge>
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider border-zinc-800 text-zinc-300">
+                    {latestResultJob.job_type}
+                  </Badge>
+                  <span className="font-mono text-[10px] text-zinc-500">{latestResultJob.id.slice(0, 8)}</span>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-200">
-                  <pre className="whitespace-pre-wrap break-words text-xs leading-6 text-zinc-300">{formatResult(latestResultJob.result)}</pre>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-xs font-mono leading-relaxed text-zinc-300 max-h-48 overflow-y-auto">
+                  {latestResultJob.result ? (
+                    <pre>{JSON.stringify(latestResultJob.result, null, 2)}</pre>
+                  ) : (
+                    <span className="text-zinc-600">[WAITING FOR ASYNC RESULT STREAM...]</span>
+                  )}
                 </div>
               </>
             ) : (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">Launch a task to see its output here.</div>
+              <div className="rounded-lg border border-dashed border-zinc-800 p-8 text-center text-xs font-mono text-zinc-600">
+                DEPLOY A BLUEPRINT TASK TO SEE ACTIVE STDOUT/STDERR.
+              </div>
             )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent tasks</CardTitle>
-            <CardDescription>Current queue history with payload and result snapshots.</CardDescription>
+        <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
+          <CardHeader className="pb-3 border-b border-zinc-800/60">
+            <CardTitle className="font-mono text-xs uppercase tracking-wider text-zinc-400">Deploy Pipeline History</CardTitle>
+            <CardDescription className="text-zinc-500">Auditable state log of your recent task runs.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="pt-4 space-y-3">
             {recentJobs.map((job) => (
-              <div key={job.id} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="font-medium text-white">{job.job_type}</span>
-                  <Badge variant={job.status === "dead_lettered" ? "destructive" : "secondary"}>{job.status}</Badge>
+              <div key={job.id} className="rounded-lg border border-zinc-850 bg-zinc-900/10 p-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white font-mono text-sm">{job.job_type}</span>
+                  <span className="font-mono text-[10px] border border-zinc-800 px-2 py-0.5 rounded uppercase tracking-wider text-zinc-400 bg-zinc-950">
+                    {job.status}
+                  </span>
                 </div>
-                <div className="mt-2 text-xs text-zinc-500">Created {new Date(job.created_at).toLocaleString()}</div>
-                <div className="mt-3 rounded-xl border border-white/10 bg-black/10 p-3 text-xs text-zinc-400">{JSON.stringify(job.payload)}</div>
-                {job.result ? <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-50">{formatResult(job.result)}</div> : null}
+                <div className="mt-1 text-[10px] font-mono text-zinc-500">UUID: {job.id.slice(0, 8)}</div>
               </div>
             ))}
-            {!recentJobs.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No tasks launched yet.</div> : null}
+            {!recentJobs.length ? (
+              <div className="rounded-lg border border-dashed border-zinc-800 p-8 text-center text-xs font-mono text-zinc-600">
+                NO HISTORY REPORTED.
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
