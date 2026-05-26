@@ -11,7 +11,7 @@ type HiddenSessionContextType = {
 const HiddenSessionContext = createContext<HiddenSessionContextType | undefined>(undefined);
 
 export function HiddenSessionProvider({ children }: { children: ReactNode }) {
-  const { tokenState } = useToken();
+  const { tokenState, setTokenState } = useToken();
   const [hiddenSessionId, setHiddenSessionId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,9 +29,19 @@ export function HiddenSessionProvider({ children }: { children: ReactNode }) {
         const fd = new FormData();
         fd.append("file", file);
         fd.append("name", "hidden_context");
-        return apiFetch("/sessions", { method: "POST", body: fd });
+          // Use the global token helpers to call the sessions endpoint
+          // apiFetch(baseUrl, tokenState, setTokenState, path, init?)
+          return apiFetch(
+            // base URL – the front‑end already knows the API root via NEXT_PUBLIC_API_BASE_URL
+            // we can reuse the same base URL used elsewhere (empty string means relative to the current origin)
+            "",
+            tokenState,
+            setTokenState,
+            "/sessions",
+            { method: "POST", body: fd }
+          );
       })
-      .then((resp) => resp.json())
+      .then((resp) => (resp as Response).json())
       .then((json) => {
         const id = json?.data?.session_id;
         if (id) setHiddenSessionId(id);
