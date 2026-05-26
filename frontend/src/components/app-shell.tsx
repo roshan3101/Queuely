@@ -51,7 +51,7 @@ export function AppShell({ title, subtitle, onSignOut }: { title: string; subtit
                       className={cn(
                         "flex items-center gap-3 rounded-lg border px-4 py-2.5 text-xs font-mono uppercase tracking-wider transition",
                         active
-                          ? "border-foreground bg-zinc-100 text-foreground font-bold dark:bg-zinc-900"
+                          ? "border-cyan-400/40 bg-cyan-50 text-foreground dark:bg-cyan-400/10"
                           : "border-transparent text-zinc-500 hover:text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
                       )}
                     >

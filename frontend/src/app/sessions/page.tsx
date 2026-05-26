@@ -242,8 +242,8 @@ export default function SessionsPage() {
         </Card>
 
         {/* SESSION SELECTOR */}
-        <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
-          <CardHeader className="pb-3 border-b border-zinc-800/60">
+        <Card className="border-border bg-card text-foreground">
+          <CardHeader className="pb-3 border-b border-border">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-zinc-400">Sessions</CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -253,29 +253,29 @@ export default function SessionsPage() {
                 onClick={() => setActiveSessionId(s.id)}
                 className={`w-full rounded-lg border p-3 text-left transition ${
                   s.id === activeSessionId
-                    ? "border-white bg-zinc-900"
-                    : "border-zinc-850 bg-zinc-950 hover:bg-zinc-900/40"
+                    ? "border-cyan-400/40 bg-cyan-50 text-foreground dark:bg-cyan-400/10"
+                    : "border-border bg-card hover:border-border hover:bg-muted dark:bg-zinc-900/30 dark:hover:bg-zinc-900/50"
                 }`}
               >
-                <div className="font-mono text-xs font-bold text-white truncate">{s.title}</div>
-                <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                <div className="font-mono text-xs font-bold text-foreground truncate">{s.title}</div>
+                <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
                   <span>UUID: {s.id.slice(0, 8)}</span>
                 </div>
               </button>
             ))}
             {!sessions.length && (
-              <div className="text-center py-4 text-xs font-mono text-zinc-600">NO SESSION CONSOLE FOUND.</div>
+              <div className="text-center py-4 text-xs font-mono text-muted-foreground">NO SESSION CONSOLE FOUND.</div>
             )}
           </CardContent>
         </Card>
 
         {/* CODEBASE CONTEXT UPLOADS */}
-        <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
-          <CardHeader className="pb-3 border-b border-zinc-800/60">
+        <Card className="border-border bg-card text-foreground">
+          <CardHeader className="pb-3 border-b border-border">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-zinc-400">RAG Context Files</CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
-            <label className="block rounded-lg border border-dashed border-zinc-800 p-3 text-center cursor-pointer hover:bg-zinc-900/20">
+            <label className="block rounded-lg border border-dashed border-border p-3 text-center cursor-pointer hover:bg-muted dark:hover:bg-zinc-900/50">
               <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Load File Context</span>
               <input
                 type="file"
@@ -285,7 +285,7 @@ export default function SessionsPage() {
             </label>
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
               {files.map((file) => (
-                <div key={file.id} className="rounded border border-zinc-850 p-2.5 flex items-center justify-between gap-2 bg-zinc-900/10">
+                <div key={file.id} className="rounded border border-border p-2.5 flex items-center justify-between gap-2 bg-muted dark:bg-zinc-900/30">
                   <div className="min-w-0 flex items-center gap-1.5">
                     <FileCode className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" />
                     <div className="font-mono text-[10px] text-zinc-200 truncate">{file.original_name}</div>
@@ -304,11 +304,11 @@ export default function SessionsPage() {
       </aside>
 
       {/* CHAT VIEW WORKSPACE */}
-      <section className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-50 overflow-hidden min-h-[560px]">
+      <section className="flex flex-col rounded-xl border border-border bg-card text-foreground overflow-hidden min-h-[560px]">
         {/* WORKSPACE HEADER */}
-        <div className="flex items-center justify-between border-b border-zinc-800/60 bg-zinc-900/20 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-border bg-muted/20 px-5 py-4">
           <div>
-            <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-white">
+            <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-foreground">
               {activeSession ? activeSession.title : "SELECT A WORKSPACE CONSOLE"}
             </h2>
             <p className="mt-0.5 text-xs text-zinc-500 font-mono">
@@ -332,7 +332,7 @@ export default function SessionsPage() {
               key={message.id}
               className={`rounded-lg border p-4 max-w-[88%] leading-relaxed ${
                 message.role === "user"
-                  ? "ml-auto border-white/20 bg-zinc-900/30 text-zinc-100"
+                  ? "ml-auto border-white/20 bg-zinc-900 text-zinc-300"
                   : "mr-auto border-zinc-800 bg-zinc-950 text-zinc-300"
               }`}
             >
@@ -373,7 +373,7 @@ export default function SessionsPage() {
         </div>
 
         {/* INPUT PROMPT CONTROL BAR */}
-        <div className="border-t border-zinc-800/60 p-4 bg-zinc-950">
+        <div className="border-t border-border px-5 py-4">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3.5">
             <textarea
               value={promptDraft}
