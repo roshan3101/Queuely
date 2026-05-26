@@ -78,3 +78,31 @@ def test_auth_sessions_files_flow() -> None:
     file_list = _get("/files?limit=10&offset=0", token=token)
     assert file_list.status_code == 200
     assert file_list.json()["data"]["items"]
+
+
+def test_tasks_aliases_jobs() -> None:
+    email = "tasks@example.com"
+    password = "Password123!"
+
+    register = _post_json("/auth/register", {"email": email, "password": password, "full_name": "Tasks"})
+    assert register.status_code in (201, 409)
+
+    login = _post_json("/auth/login", {"email": email, "password": password})
+    assert login.status_code == 200
+    token = login.json()["data"]["tokens"]["access_token"]
+
+    submit = _post_json(
+        "/tasks",
+        {
+            "job_type": "custom",
+            "payload": {"source": "integration-test", "mode": "direct-task"},
+            "priority": 5,
+            "max_retries": 3,
+        },
+        token=token,
+    )
+    assert submit.status_code == 202
+
+    list_tasks = _get("/tasks?limit=10&offset=0", token=token)
+    assert list_tasks.status_code == 200
+    assert any(item["job_type"] == "custom" for item in list_tasks.json()["data"]["items"])

@@ -14,6 +14,7 @@ from queuely.api.routes.jobs import router as jobs_router
 from queuely.api.routes.ops import router as ops_router
 from queuely.api.routes.sessions import router as sessions_router
 from queuely.api.routes.system import router as system_router
+from queuely.api.routes.tasks import router as tasks_router
 from queuely.api.routes.ws import router as ws_router
 from queuely.core.config import get_settings
 from queuely.core.logging import configure_logging
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(ops_router)
     app.include_router(sessions_router)
     app.include_router(system_router)
+    app.include_router(tasks_router)
     app.include_router(ws_router)
 
     @app.get("/health", tags=["system"])

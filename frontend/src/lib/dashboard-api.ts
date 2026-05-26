@@ -28,7 +28,7 @@ export const dashboardApi = {
     payload: Record<string, unknown>,
     options?: { priority?: number; maxRetries?: number; scheduledAt?: string | null; idempotencyKey?: string | null },
   ) =>
-    apiFetch<ApiResponse<JobRecord>>(API_BASE, tokenState, setTokenState, "/jobs", {
+    apiFetch<ApiResponse<JobRecord>>(API_BASE, tokenState, setTokenState, "/tasks", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -77,7 +77,7 @@ export const dashboardApi = {
   listDeadLetters: (tokenState: TokenState, setTokenState: (next: TokenState) => void) =>
     apiFetch<ApiResponse<{ items: JobRecord[]; total: number; limit: number; offset: number }>>(API_BASE, tokenState, setTokenState, "/ops/jobs/dead-lettered?limit=100&offset=0").then((response) => response.data),
   listJobs: (tokenState: TokenState, setTokenState: (next: TokenState) => void) =>
-    apiFetch<ApiResponse<{ items: JobRecord[]; total: number; limit: number; offset: number }>>(API_BASE, tokenState, setTokenState, "/ops/jobs?limit=100&offset=0").then((response) => response.data),
+    apiFetch<ApiResponse<{ items: JobRecord[]; total: number; limit: number; offset: number }>>(API_BASE, tokenState, setTokenState, "/tasks?limit=100&offset=0").then((response) => response.data),
   listRateLimits: (tokenState: TokenState, setTokenState: (next: TokenState) => void) =>
     apiFetch<ApiResponse<{ items: RateLimitBucketRecord[]; total: number; limit: number; offset: number }>>(API_BASE, tokenState, setTokenState, "/ops/rate-limits?limit=50&offset=0").then((response) => response.data),
 };

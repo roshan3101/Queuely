@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { clearTokens, readTokens, type TokenState } from "@/lib/authStorage";
+import { readTokens, type TokenState } from "@/lib/authStorage";
 import { dashboardApi } from "@/lib/dashboard-api";
 import type { JobRecord } from "@/lib/dashboard-types";
 
@@ -26,8 +25,7 @@ export default function JobsPage() {
   }, [ready, tokenState]);
 
   return (
-    <AppShell title="Jobs" subtitle="Queue history and current state" onSignOut={clearTokens}>
-      <Card>
+    <Card>
         <CardHeader>
           <CardTitle>Job feed</CardTitle>
           <CardDescription>View the latest jobs submitted to Celery and the backend retry flow.</CardDescription>
@@ -59,6 +57,5 @@ export default function JobsPage() {
           {error ? <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div> : null}
         </CardContent>
       </Card>
-    </AppShell>
   );
 }

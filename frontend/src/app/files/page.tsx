@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpFromLine, RefreshCcw, Search, Trash2, FolderUp } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
 import FileModal from "@/components/FileModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { clearTokens, readTokens, type TokenState } from "@/lib/authStorage";
+import { readTokens, type TokenState } from "@/lib/authStorage";
 import { dashboardApi } from "@/lib/dashboard-api";
 import type { FileRecord } from "@/lib/dashboard-types";
 import { formatBytes, shortId } from "@/lib/uiHelpers";
+import { useToast } from "@/components/ui/use-toast";
 
 const FILE_ACCEPT = ".py,.js,.ts,.tsx,.jsx,.json,.md,.pdf,.sql,.yaml,.yml,.txt,.toml,.cfg,.ini,.css,.html";
 
@@ -24,6 +24,7 @@ export default function FilesPage() {
   const [pendingReindexFileId, setPendingReindexFileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const { toast } = useToast();
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const reindexInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -59,9 +60,12 @@ export default function FilesPage() {
     try {
       const result = await dashboardApi.uploadFile(tokenState, setTokenState, file);
       setStatus(`Uploaded ${result.original_name} (${result.status}).`);
+      toast({ title: "File uploaded", description: `${result.original_name} is ready for task processing.`, variant: "success" });
       await loadFiles();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      const message = e instanceof Error ? e.message : "Upload failed";
+      setError(message);
+      toast({ title: "Upload failed", description: message, variant: "error" });
     } finally {
       setBusyAction(null);
     }
@@ -74,9 +78,12 @@ export default function FilesPage() {
     try {
       const result = await dashboardApi.reindexFile(tokenState, setTokenState, fileId, file);
       setStatus(`Reindexed ${result.original_name} (${result.status}).`);
+      toast({ title: "File reindexed", description: `${result.original_name} was refreshed successfully.`, variant: "info" });
       await loadFiles();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Reindex failed");
+      const message = e instanceof Error ? e.message : "Reindex failed";
+      setError(message);
+      toast({ title: "Reindex failed", description: message, variant: "warning" });
     } finally {
       setBusyAction(null);
     }
@@ -93,17 +100,20 @@ export default function FilesPage() {
     try {
       const result = await dashboardApi.deleteFile(tokenState, setTokenState, fileId);
       setStatus(result.deleted ? "File deleted." : "Delete request completed.");
+      toast({ title: "File deleted", description: file?.original_name ? `${file.original_name} was removed.` : "The file was removed.", variant: "warning" });
       setSelectedFileId((current) => (current === fileId ? null : current));
       await loadFiles();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Delete failed");
+      const message = e instanceof Error ? e.message : "Delete failed";
+      setError(message);
+      toast({ title: "Delete failed", description: message, variant: "error" });
     } finally {
       setBusyAction(null);
     }
   };
 
   return (
-    <AppShell title="Files" subtitle="Uploaded sources, reindexing, and cleanup" onSignOut={clearTokens}>
+    <>
       <input
         ref={uploadInputRef}
         type="file"
@@ -253,6 +263,6 @@ export default function FilesPage() {
         onDelete={(file) => void handleDelete(file.id)}
         busyAction={busyAction === "reindex" ? "reindex" : busyAction === "delete" ? "delete" : null}
       />
-    </AppShell>
+    </>
   );
 }
