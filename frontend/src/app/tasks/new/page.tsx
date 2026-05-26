@@ -366,8 +366,7 @@ export default function TaskLauncherPage() {
                     <Input
                       value={taskDraft.emailTo}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, emailTo: event.target.value }))}
-                      className="border-zinc-800 bg-zinc-900 text-sm font-mono"
-                        className="border-border bg-card text-sm font-mono text-foreground"
+                      className="border-border bg-card text-sm font-mono text-foreground"
                       placeholder="operator@queuely.internal"
                     />
                   </div>
@@ -376,8 +375,7 @@ export default function TaskLauncherPage() {
                     <Input
                       value={taskDraft.emailSubject}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, emailSubject: event.target.value }))}
-                      className="border-zinc-800 bg-zinc-900 text-sm"
-                                          className="border-border bg-card text-sm text-foreground"
+                      className="border-border bg-card text-sm text-foreground"
                     />
                   </div>
                   <div className="space-y-2">
@@ -386,8 +384,7 @@ export default function TaskLauncherPage() {
                       value={taskDraft.emailBody}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, emailBody: event.target.value }))}
                       rows={3}
-                      className="border-zinc-800 bg-zinc-900 text-xs font-mono"
-                                          className="border-border bg-card text-xs font-mono text-foreground"
+                      className="border-border bg-card text-xs font-mono text-foreground"
                     />
                   </div>
                   <label className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 p-3.5 text-xs font-mono text-foreground cursor-pointer select-none">
