@@ -1,3 +1,5 @@
+"use client";
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useToken } from "@/app/providers/TokenProvider";
 import { apiFetch } from "@/lib/apiClient";
