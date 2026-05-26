@@ -1,0 +1,2 @@
+This is a hidden context file used for local PDF processing tests.
+You can safely delete it after use.
