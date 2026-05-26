@@ -123,7 +123,8 @@ def _validate_upload(filename: str, data: bytes) -> None:
         raise QueuelyError("file_too_large", "Uploaded file exceeds the configured size limit.", status_code=413)
     if any(data.startswith(prefix) for prefix in DISALLOWED_MAGIC_PREFIXES):
         raise QueuelyError("unsafe_file_content", "Executable or binary file signatures are not allowed.", status_code=400)
-    if b"\x00" in data:
+    # Allow binary content (null bytes) for PDFs; other file types must be text-only
+    if ext != ".pdf" and b"\x00" in data:
         raise QueuelyError("unsafe_file_content", "Binary file content is not allowed.", status_code=400)
 
 

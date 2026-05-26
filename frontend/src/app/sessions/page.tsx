@@ -221,9 +221,9 @@ export default function SessionsPage() {
     <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
       {/* SIDEBAR CONSOLE */}
       <aside className="space-y-6">
-        <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
-          <CardHeader className="pb-3 border-b border-zinc-800/60">
-            <CardTitle className="font-mono text-xs uppercase tracking-wider text-zinc-400">Spawn Session</CardTitle>
+        <Card className="border-border bg-card text-foreground">
+          <CardHeader className="pb-3 border-b border-border">
+            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Spawn Session</CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             <input
