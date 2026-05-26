@@ -56,7 +56,7 @@ export default function FileModal({ fileDetails, onClose, onReindex, onDelete, b
               <MetaRow label="Size" value={formatBytes(fileDetails.size_bytes)} />
               <MetaRow label="File ID" value={shortId(fileDetails.id)} />
               <MetaRow label="Status" value={fileDetails.status} />
-              <MetaRow label="Session" value={fileDetails.session_id ? shortId(fileDetails.session_id) : "global"} />
+              <MetaRow label="Source" value={fileDetails.session_id ? shortId(fileDetails.session_id) : "global"} />
             </CardContent>
           </Card>
 

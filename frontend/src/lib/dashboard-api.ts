@@ -21,6 +21,27 @@ export const dashboardApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
     }).then((response) => response.data),
+  createJob: (
+    tokenState: TokenState,
+    setTokenState: (next: TokenState) => void,
+    jobType: string,
+    payload: Record<string, unknown>,
+    options?: { priority?: number; maxRetries?: number; scheduledAt?: string | null; idempotencyKey?: string | null },
+  ) =>
+    apiFetch<ApiResponse<JobRecord>>(API_BASE, tokenState, setTokenState, "/jobs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(options?.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}),
+      },
+      body: JSON.stringify({
+        job_type: jobType,
+        payload,
+        priority: options?.priority ?? 5,
+        max_retries: options?.maxRetries ?? 5,
+        scheduled_at: options?.scheduledAt ?? null,
+      }),
+    }).then((response) => response.data),
   listFiles: (tokenState: TokenState, setTokenState: (next: TokenState) => void) =>
     apiFetch<ApiResponse<{ items: FileRecord[]; total: number; limit: number; offset: number }>>(API_BASE, tokenState, setTokenState, "/files?limit=200&offset=0").then((response) => response.data),
   uploadFile: (tokenState: TokenState, setTokenState: (next: TokenState) => void, file: File, sessionId?: string | null) => {

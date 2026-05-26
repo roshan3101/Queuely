@@ -159,7 +159,7 @@ export default function FilesPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Language</TableHead>
                   <TableHead>Size</TableHead>
-                  <TableHead>Session</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

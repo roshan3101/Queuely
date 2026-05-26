@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, MessageSquareMore, FolderUp, KanbanSquare, ShieldCheck, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderUp, KanbanSquare, PlusCircle, ShieldCheck, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -20,7 +20,7 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/sessions", label: "Sessions", icon: MessageSquareMore },
+  { href: "/tasks/new", label: "Add task", icon: PlusCircle },
   { href: "/jobs", label: "Jobs", icon: KanbanSquare },
   { href: "/files", label: "Files", icon: FolderUp },
   { href: "/ops", label: "Ops", icon: ShieldCheck },

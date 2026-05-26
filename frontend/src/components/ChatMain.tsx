@@ -18,8 +18,8 @@ export default function ChatMain({
     <section className="rounded-[28px] border border-white/10 bg-white/5 backdrop-blur">
       <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">{activeSession?.title ?? "Select a session"}</h2>
-          <p className="text-sm text-zinc-500">{isLoading ? "Refreshing..." : activeSession ? `Session ${activeSession.id.slice(0,8)}` : "Create or select a debug session to continue."}</p>
+          <h2 className="text-lg font-semibold text-white">{activeSession?.title ?? "Select a task"}</h2>
+          <p className="text-sm text-zinc-500">{isLoading ? "Refreshing..." : activeSession ? `Task ${activeSession.id.slice(0,8)}` : "Create or select a task to continue."}</p>
         </div>
         <div className="flex items-center gap-2 text-xs text-zinc-400">
           <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">{messages.length} messages</span>
@@ -47,7 +47,7 @@ export default function ChatMain({
 
       <div className="border-t border-white/10 p-5">
         <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-          <textarea value={draft} onChange={(e:any)=>setDraft(e.target.value)} rows={5} placeholder="Ask a question about the current debug session, uploaded files, or generated output..." className="w-full resize-none bg-transparent text-sm leading-7 text-zinc-100 outline-none placeholder:text-zinc-600" />
+          <textarea value={draft} onChange={(e:any)=>setDraft(e.target.value)} rows={5} placeholder="Ask a question about the current task, uploaded files, or generated output..." className="w-full resize-none bg-transparent text-sm leading-7 text-zinc-100 outline-none placeholder:text-zinc-600" />
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-xs text-zinc-500">Streaming uses <code>POST /sessions/{"{session_id}"}/messages/stream</code> and persists the final assistant response plus provenance.</div>
             <div className="flex items-center gap-2">

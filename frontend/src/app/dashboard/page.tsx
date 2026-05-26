@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import Link from "next/link";
-import { ArrowRight, BarChart3, Bot, CircleAlert, Database, FileText, Gauge, RefreshCcw, ServerCog, ShieldCheck, Workflow } from "lucide-react";
+import { ArrowRight, BarChart3, CircleAlert, Database, FileText, Gauge, RefreshCcw, ServerCog, ShieldCheck, Workflow } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { clearTokens, readTokens, type TokenState } from "@/lib/authStorage";
 import { dashboardApi } from "@/lib/dashboard-api";
-import type { FileRecord, JobRecord, QueueDepth, RateLimitBucketRecord, SessionRecord, WorkerRecord } from "@/lib/dashboard-types";
+import type { FileRecord, JobRecord, QueueDepth, RateLimitBucketRecord, WorkerRecord } from "@/lib/dashboard-types";
 
 function MiniBars({ values, tone }: { values: number[]; tone: "cyan" | "emerald" | "amber" | "rose" }) {
   const max = Math.max(...values, 1);
@@ -54,7 +54,6 @@ function MetricCard({ label, value, detail, icon: Icon }: { label: string; value
 export default function DashboardPage() {
   const [tokenState, setTokenState] = useState<TokenState>({ accessToken: "", refreshToken: "" });
   const [ready, setReady] = useState(false);
-  const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [deadLetters, setDeadLetters] = useState<JobRecord[]>([]);
   const [files, setFiles] = useState<FileRecord[]>([]);
@@ -72,7 +71,6 @@ export default function DashboardPage() {
     if (!ready || !tokenState.accessToken) return;
 
     void Promise.all([
-      dashboardApi.listSessions(tokenState, setTokenState).then((data) => setSessions(data.items)).catch((e) => setError(e instanceof Error ? e.message : "Failed to load sessions")),
       dashboardApi.listJobs(tokenState, setTokenState).then((data) => setJobs(data.items)).catch(() => void 0),
       dashboardApi.listDeadLetters(tokenState, setTokenState).then((data) => setDeadLetters(data.items)).catch(() => void 0),
       dashboardApi.listFiles(tokenState, setTokenState).then((data) => setFiles(data.items)).catch(() => void 0),
@@ -82,6 +80,7 @@ export default function DashboardPage() {
     ]);
   }, [ready, tokenState]);
 
+  const launchedTasks = useMemo(() => jobs.length, [jobs]);
   const activeJobs = useMemo(() => jobs.filter((job) => job.status === "running" || job.status === "queued").length, [jobs]);
   const succeededJobs = useMemo(() => jobs.filter((job) => job.status === "succeeded").length, [jobs]);
   const failedJobs = useMemo(() => jobs.filter((job) => job.status === "failed" || job.status === "dead_lettered").length, [jobs]);
@@ -98,7 +97,7 @@ export default function DashboardPage() {
   return (
     <AppShell title="Dashboard" subtitle="System overview and quick navigation" onSignOut={clearTokens}>
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Sessions" value={sessions.length} detail="Recent debugging workspaces" icon={Bot} />
+        <MetricCard label="Tasks launched" value={launchedTasks} detail="Direct uploads and processing runs" icon={Workflow} />
         <MetricCard label="Jobs active" value={activeJobs} detail="Queued or running tasks" icon={Workflow} />
         <MetricCard label="Files ready" value={readyFiles} detail="Indexed uploads available for retrieval" icon={FileText} />
         <MetricCard label="Healthy workers" value={`${healthyWorkers}/${workers.length || 0}`} detail="Celery workers reporting heartbeats" icon={ServerCog} />
@@ -119,13 +118,13 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <Button asChild variant="secondary" className="justify-start">
-              <Link href="/sessions/new">
-                Create session <ArrowRight className="h-4 w-4" />
+              <Link href="/tasks/new">
+                Add task <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button asChild variant="secondary" className="justify-start">
-              <Link href="/sessions">
-                Open sessions <ArrowRight className="h-4 w-4" />
+              <Link href="/jobs">
+                Open jobs <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button asChild variant="secondary" className="justify-start">
@@ -273,27 +272,8 @@ export default function DashboardPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Recent sessions</CardTitle>
-            <CardDescription>Latest debugging sessions pulled from the backend.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {sessions.slice(0, 5).map((session) => (
-              <Link key={session.id} href={`/sessions/${session.id}`} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 transition hover:border-cyan-400/30 hover:bg-cyan-400/10">
-                <div>
-                  <div className="font-medium text-white">{session.title}</div>
-                  <div className="text-xs text-zinc-500">{session.model_name ?? "default model"}</div>
-                </div>
-                <Badge variant="secondary">{session.status}</Badge>
-              </Link>
-            ))}
-            {!sessions.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No sessions yet.</div> : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent jobs</CardTitle>
-            <CardDescription>Latest queue activity and payload snapshots.</CardDescription>
+            <CardTitle>Recent tasks</CardTitle>
+            <CardDescription>Latest launches, payload snapshots, and completion state.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {jobs.slice(0, 5).map((job) => (
@@ -304,9 +284,30 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-1 text-xs text-zinc-500">{job.queue_name} • {new Date(job.created_at).toLocaleString()}</div>
                 <div className="mt-2 truncate text-sm text-zinc-300">{JSON.stringify(job.payload)}</div>
+                {job.result ? <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-50">{JSON.stringify(job.result)}</div> : null}
               </div>
             ))}
-            {!jobs.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No jobs loaded yet.</div> : null}
+            {!jobs.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No tasks launched yet.</div> : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Latest results</CardTitle>
+            <CardDescription>Finished jobs that already produced output.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {jobs.filter((job) => job.result).slice(0, 5).map((job) => (
+              <div key={job.id} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-white">{job.job_type}</span>
+                  <Badge variant="secondary">{job.status}</Badge>
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">{new Date(job.updated_at).toLocaleString()}</div>
+                <div className="mt-2 max-h-28 overflow-auto rounded-xl border border-white/10 bg-black/10 p-3 text-xs text-zinc-300">{JSON.stringify(job.result, null, 2)}</div>
+              </div>
+            ))}
+            {!jobs.some((job) => job.result) ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No completed results yet.</div> : null}
           </CardContent>
         </Card>
       </div>

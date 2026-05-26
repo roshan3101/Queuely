@@ -19,7 +19,7 @@ export default function SessionSidebar({
     <aside className="rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.24em] text-zinc-300">Sessions</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.24em] text-zinc-300">Tasks</h2>
           <p className="mt-1 text-xs text-zinc-500">{sessions.length} available</p>
         </div>
       </div>
@@ -28,7 +28,7 @@ export default function SessionSidebar({
           <span className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">New title</span>
           <input value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} className="mt-1 w-full bg-transparent text-sm outline-none placeholder:text-zinc-600" placeholder="Design review session" />
         </label>
-        <button onClick={() => createSession()} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-white transition hover:border-cyan-400/30 hover:bg-cyan-400/10">Create session</button>
+          <button onClick={() => createSession()} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-white transition hover:border-cyan-400/30 hover:bg-cyan-400/10">Add task</button>
       </div>
       <div className="mt-4 space-y-2">
         {sessions.map((session: any) => (
@@ -43,7 +43,7 @@ export default function SessionSidebar({
             </div>
           </button>
         ))}
-        {!sessions.length ? <p className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-zinc-500">No sessions yet.</p> : null}
+        {!sessions.length ? <p className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-zinc-500">No tasks yet.</p> : null}
 
         <div className="mt-6 rounded-[22px] border border-white/10 bg-black/20 p-4">
           <div className="flex items-center justify-between">

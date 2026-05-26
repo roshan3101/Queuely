@@ -27,6 +27,8 @@ export type FileRecord = {
   size_bytes: number;
   created_at: string;
   updated_at: string;
+  storage_provider: string | null;
+  storage_url: string | null;
 };
 
 export type FileUploadResponse = {
@@ -34,6 +36,9 @@ export type FileUploadResponse = {
   status: string;
   original_name: string;
   size_bytes: number;
+  storage_provider: string | null;
+  storage_url: string | null;
+  cloudinary_public_id: string | null;
 };
 
 export type FileDeleteResponse = {

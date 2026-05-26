@@ -54,7 +54,7 @@ export default function LoginPage() {
           <CardHeader>
             <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300/80">Queuely</div>
             <CardTitle>Sign in</CardTitle>
-            <CardDescription>Login to the dashboard and open your sessions, jobs, and ops tools.</CardDescription>
+            <CardDescription>Login to the dashboard and open your tasks, jobs, and ops tools.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="grid gap-2">

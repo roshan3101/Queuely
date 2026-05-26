@@ -8,7 +8,7 @@ RUN npm ci
 FROM base AS dev
 COPY . .
 EXPOSE 3000
-CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+CMD ["sh", "-c", "mkdir -p .next/dev/logs && npm run dev -- --hostname 0.0.0.0 --port 3000"]
 
 FROM base AS build
 COPY . .

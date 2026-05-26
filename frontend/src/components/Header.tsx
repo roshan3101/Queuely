@@ -18,7 +18,7 @@ export default function Header({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300/80">Queuely</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">Queues, real-time events, and AI sessions</h1>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">Queues, real-time events, and direct tasks</h1>
           <p className="mt-1 max-w-3xl text-sm text-zinc-400">A recruiter-facing surface over the FastAPI + Celery + Redis + Postgres stack.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -34,7 +34,7 @@ export default function Header({
             disabled={isLoading}
             className="h-11 rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-60"
           >
-            New session
+            Add task
           </button>
           <div className="ml-1 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200">
             <div className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">Status</div>

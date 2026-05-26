@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Queuely",
-  description: "Distributed task processing and AI session dashboard",
+  description: "Distributed task processing dashboard",
 };
 
 export default function RootLayout({
