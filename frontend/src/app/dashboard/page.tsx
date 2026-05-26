@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import Link from "next/link";
-import { ArrowRight, BarChart3, CircleAlert, Database, FileText, Gauge, RefreshCcw, ServerCog, ShieldCheck, Workflow } from "lucide-react";
+import { ArrowRight, FileText, Gauge, ServerCog, ShieldCheck, Workflow, CircleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,41 +10,16 @@ import { readTokens, type TokenState } from "@/lib/authStorage";
 import { dashboardApi } from "@/lib/dashboard-api";
 import type { FileRecord, JobRecord, QueueDepth, RateLimitBucketRecord, WorkerRecord } from "@/lib/dashboard-types";
 
-function MiniBars({ values, tone }: { values: number[]; tone: "cyan" | "emerald" | "amber" | "rose" }) {
-  const max = Math.max(...values, 1);
-  const toneClass = {
-    cyan: "bg-cyan-400",
-    emerald: "bg-emerald-400",
-    amber: "bg-amber-400",
-    rose: "bg-rose-400",
-  }[tone];
-
-  return (
-    <div className="mt-4 flex h-24 items-end gap-2">
-      {values.map((value, index) => (
-        <div key={`${index}-${value}`} className="flex flex-1 items-end">
-          <div className="flex w-full flex-col items-center gap-2">
-            <div className="w-full rounded-full bg-white/8 p-1">
-              <div className={`rounded-full ${toneClass}`} style={{ height: `${Math.max(8, (value / max) * 88)}px` }} />
-            </div>
-            <span className="text-[11px] text-zinc-500">{value}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function MetricCard({ label, value, detail, icon: Icon }: { label: string; value: string | number; detail: string; icon: ComponentType<{ className?: string }> }) {
   return (
-    <Card className="bg-linear-to-br from-white/8 to-transparent">
-      <CardHeader className="pb-3">
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-3xl">{value}</CardTitle>
+    <Card className="border-border bg-card text-foreground">
+      <CardHeader className="pb-2">
+        <CardDescription className="text-zinc-500 font-mono text-[10px] uppercase tracking-wider">{label}</CardDescription>
+        <CardTitle className="text-2xl font-bold font-mono tracking-tight text-foreground">{value}</CardTitle>
       </CardHeader>
-      <CardContent className="flex items-center justify-between text-sm text-zinc-400">
+      <CardContent className="flex items-center justify-between text-xs font-mono text-zinc-500 pt-0">
         <span>{detail}</span>
-        <Icon className="h-4 w-4 text-cyan-300" />
+        <Icon className="h-4 w-4 text-zinc-400 dark:text-zinc-650" />
       </CardContent>
     </Card>
   );
@@ -94,112 +69,127 @@ export default function DashboardPage() {
   }, [rateLimits]);
 
   return (
-    <>
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Tasks launched" value={launchedTasks} detail="Direct uploads and processing runs" icon={Workflow} />
-        <MetricCard label="Jobs active" value={activeJobs} detail="Queued or running tasks" icon={Workflow} />
-        <MetricCard label="Files ready" value={readyFiles} detail="Indexed uploads available for retrieval" icon={FileText} />
-        <MetricCard label="Healthy workers" value={`${healthyWorkers}/${workers.length || 0}`} detail="Celery workers reporting heartbeats" icon={ServerCog} />
+    <div className="space-y-6">
+      <div className="flex items-center justify-between border-b border-border pb-4">
+        <h1 className="text-xl font-bold font-mono tracking-tight uppercase text-foreground">Console Overview</h1>
+        <span className="font-mono text-xs text-zinc-500 uppercase tracking-widest">[SYSTEM STABLE]</span>
+      </div>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Tasks Launched" value={launchedTasks} detail="Direct uploads and task runs" icon={Workflow} />
+        <MetricCard label="Jobs Active" value={activeJobs} detail="Queued or running tasks" icon={Workflow} />
+        <MetricCard label="Files Context Indexed" value={readyFiles} detail="Source files for AI vector retrieval" icon={FileText} />
+        <MetricCard label="Cluster Workers" value={`${healthyWorkers}/${workers.length || 0}`} detail="Celery heartbeats reporting nominal" icon={ServerCog} />
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card>
-          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card className="border-border bg-card">
+          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 pb-4 border-b border-border/40">
             <div>
-              <CardTitle>Quick actions</CardTitle>
-              <CardDescription>Jump into the main workflows from one place.</CardDescription>
+              <CardTitle>Launch Console Actions</CardTitle>
+              <CardDescription>Initiate queue operations or manage indexed memory.</CardDescription>
             </div>
-            <Button variant="secondary" asChild>
-              <Link href="/ops">Open ops <ArrowRight className="h-4 w-4" /></Link>
+            <Button variant="secondary" className="border border-border text-xs font-mono uppercase bg-card text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900" asChild>
+              <Link href="/ops">Launch Ops <ArrowRight className="ml-1 h-3 w-3" /></Link>
             </Button>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <Button asChild variant="secondary" className="justify-start"><Link href="/tasks/new">Add task <ArrowRight className="h-4 w-4" /></Link></Button>
-            <Button asChild variant="secondary" className="justify-start"><Link href="/jobs">Open jobs <ArrowRight className="h-4 w-4" /></Link></Button>
-            <Button asChild variant="secondary" className="justify-start"><Link href="/files">Manage files <ArrowRight className="h-4 w-4" /></Link></Button>
-            <Button asChild variant="secondary" className="justify-start"><Link href="/tasks/new">Review output <ArrowRight className="h-4 w-4" /></Link></Button>
+          <CardContent className="grid gap-3 sm:grid-cols-2 pt-6">
+            <Button asChild variant="secondary" className="justify-between border border-border bg-card text-foreground text-xs font-mono uppercase hover:bg-zinc-50 dark:hover:bg-zinc-900/50"><Link href="/tasks/new">Add Blueprint Task <PlusIcon /></Link></Button>
+            <Button asChild variant="secondary" className="justify-between border border-border bg-card text-foreground text-xs font-mono uppercase hover:bg-zinc-50 dark:hover:bg-zinc-900/50"><Link href="/jobs">View Active Feeds <PlusIcon /></Link></Button>
+            <Button asChild variant="secondary" className="justify-between border border-border bg-card text-foreground text-xs font-mono uppercase hover:bg-zinc-50 dark:hover:bg-zinc-900/50"><Link href="/files">Index Context Files <PlusIcon /></Link></Button>
+            <Button asChild variant="secondary" className="justify-between border border-border bg-card text-foreground text-xs font-mono uppercase hover:bg-zinc-50 dark:hover:bg-zinc-900/50"><Link href="/sessions">AI Debug Conversations <PlusIcon /></Link></Button>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Health snapshot</CardTitle>
-            <CardDescription>Worker and rate-limit status at a glance.</CardDescription>
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-4 border-b border-border/40">
+            <CardTitle>Telemetry Snapshot</CardTitle>
+            <CardDescription>Live health and allocation quotas.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-zinc-300">
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><span className="flex items-center gap-2 text-zinc-200"><ShieldCheck className="h-4 w-4 text-emerald-300" /> Healthy workers</span><Badge variant="success">{healthyWorkers}/{workers.length || 0}</Badge></div>
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><span className="flex items-center gap-2 text-zinc-200"><Gauge className="h-4 w-4 text-cyan-300" /> Rate-limit utilization</span><Badge variant="secondary">{rateLimitUtilization}%</Badge></div>
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><span className="flex items-center gap-2 text-zinc-200"><CircleAlert className="h-4 w-4 text-rose-300" /> Dead letters</span><Badge variant={deadLetters.length ? "destructive" : "secondary"}>{deadLetters.length}</Badge></div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Queue pressure</CardTitle>
-            <CardDescription>Total queue depth and the busiest queues.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><div className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Total depth</div><div className="mt-1 text-2xl font-semibold text-white">{queueDepthTotal}</div></div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><div className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Queues</div><div className="mt-1 text-2xl font-semibold text-white">{queues.length}</div></div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><div className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Peak depth</div><div className="mt-1 text-2xl font-semibold text-white">{queuePeak}</div></div>
+          <CardContent className="space-y-3 text-xs font-mono text-zinc-500 pt-6">
+            <div className="flex items-center justify-between rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 px-4 py-2.5">
+              <span className="flex items-center gap-2 text-foreground font-semibold"><ShieldCheck className="h-3.5 w-3.5" /> WORKER STATUS</span>
+              <span className="text-foreground">{healthyWorkers}/{workers.length || 0} active</span>
             </div>
-            <MiniBars values={queues.slice(0, 8).map((queue) => queue.depth)} tone="cyan" />
-            <div className="mt-4 space-y-2">
-              {queues.slice(0, 6).map((queue) => <div key={queue.name} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm"><span className="text-zinc-200">{queue.name}</span><Badge variant={queue.depth > 0 ? "secondary" : "outline"}>{queue.depth}</Badge></div>)}
-              {!queues.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No queues reported yet.</div> : null}
+            <div className="flex items-center justify-between rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 px-4 py-2.5">
+              <span className="flex items-center gap-2 text-foreground font-semibold"><Gauge className="h-3.5 w-3.5" /> RATE QUOTA SPENT</span>
+              <span className="text-foreground">{rateLimitUtilization}%</span>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Worker health</CardTitle>
-            <CardDescription>Heartbeat and activity for the active workers.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={workers.slice(0, 8).map((worker) => worker.active_jobs)} tone="emerald" />
-            <div className="mt-4 space-y-2">
-              {workers.slice(0, 6).map((worker) => <div key={`${worker.worker_name}-${worker.process_id}`} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm"><div className="min-w-0"><div className="truncate text-white">{worker.worker_name}</div><div className="text-xs text-zinc-500">{worker.queue_name} • {worker.hostname}</div></div><Badge variant={worker.healthy ? "success" : "destructive"}>{worker.healthy ? "healthy" : "stale"}</Badge></div>)}
-              {!workers.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No workers returned yet.</div> : null}
+            <div className="flex items-center justify-between rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 px-4 py-2.5">
+              <span className="flex items-center gap-2 text-foreground font-semibold"><CircleAlert className="h-3.5 w-3.5 text-zinc-400" /> DEAD LETTERS</span>
+              <span className="text-foreground">{deadLetters.length} jobs</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Dead letters</CardTitle>
-            <CardDescription>Failed jobs that may need inspection or requeueing.</CardDescription>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-4 border-b border-border/40">
+            <CardTitle>Broker Queues</CardTitle>
+            <CardDescription>Current Redis backlog and peaks.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {deadLetters.slice(0, 6).map((job) => <div key={job.id} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><div className="flex items-center justify-between gap-3 text-sm"><span className="text-white">{job.job_type}</span><Badge variant="destructive">{job.status}</Badge></div><div className="mt-1 text-xs text-zinc-500">{job.queue_name} • {new Date(job.updated_at).toLocaleString()}</div><div className="mt-2 truncate text-sm text-zinc-300">{job.error_message ?? "No error message recorded"}</div></div>)}
-            {!deadLetters.length ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No dead letters in the current window.</div> : null}
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 p-3">
+                <div className="text-[9px] uppercase tracking-wider text-zinc-500 font-mono">Total depth</div>
+                <div className="mt-1 text-xl font-bold font-mono text-foreground">{queueDepthTotal}</div>
+              </div>
+              <div className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 p-3">
+                <div className="text-[9px] uppercase tracking-wider text-zinc-500 font-mono">Queues</div>
+                <div className="mt-1 text-xl font-bold font-mono text-foreground">{queues.length}</div>
+              </div>
+              <div className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 p-3">
+                <div className="text-[9px] uppercase tracking-wider text-zinc-500 font-mono">Peak depth</div>
+                <div className="mt-1 text-xl font-bold font-mono text-foreground">{queuePeak}</div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {queues.slice(0, 4).map((queue) => (
+                <div key={queue.name} className="flex items-center justify-between rounded-lg border border-border bg-zinc-50/50 dark:bg-zinc-900/10 px-4 py-2.5 text-xs font-mono">
+                  <span className="text-zinc-500">{queue.name}</span>
+                  <span className="text-foreground font-semibold">{queue.depth}</span>
+                </div>
+              ))}
+              {!queues.length && <div className="text-center py-4 text-xs font-mono text-zinc-400">No queues active.</div>}
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Latest results</CardTitle>
-            <CardDescription>Finished jobs that already produced output.</CardDescription>
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-4 border-b border-border/40">
+            <CardTitle>Dead-Lettered Log</CardTitle>
+            <CardDescription>Terminal failures requiring manual actions.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {jobs.filter((job) => job.result).slice(0, 5).map((job) => <div key={job.id} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3"><div className="flex items-center justify-between gap-3 text-sm"><span className="text-white">{job.job_type}</span><Badge variant="secondary">{job.status}</Badge></div><div className="mt-1 text-xs text-zinc-500">{new Date(job.updated_at).toLocaleString()}</div><div className="mt-2 max-h-28 overflow-auto rounded-xl border border-white/10 bg-black/10 p-3 text-xs text-zinc-300">{JSON.stringify(job.result, null, 2)}</div></div>)}
-            {!jobs.some((job) => job.result) ? <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No completed results yet.</div> : null}
+          <CardContent className="pt-6 space-y-3">
+            {deadLetters.slice(0, 3).map((job) => (
+              <div key={job.id} className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 p-3.5 text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground">{job.job_type}</span>
+                  <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 border border-zinc-200 dark:border-zinc-800 rounded bg-card text-zinc-500">FAILED</span>
+                </div>
+                <div className="mt-1 text-[10px] text-zinc-500">ID: {job.id.slice(0, 8)} • {new Date(job.updated_at).toLocaleDateString()}</div>
+                <div className="mt-2 text-zinc-400 font-mono line-clamp-1">{job.error_message ?? "No error log reported"}</div>
+              </div>
+            ))}
+            {!deadLetters.length && <div className="text-center py-8 text-xs font-mono text-zinc-400">Zero dead letter entries recorded.</div>}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-3">
-        <Card><CardHeader className="pb-3"><CardDescription>Files</CardDescription><CardTitle>{files.length}</CardTitle></CardHeader><CardContent className="flex items-center justify-between text-sm text-zinc-400"><span>Indexed uploads</span><FileText className="h-4 w-4 text-amber-200" /></CardContent></Card>
-        <Card><CardHeader className="pb-3"><CardDescription>Succeeded jobs</CardDescription><CardTitle>{succeededJobs}</CardTitle></CardHeader><CardContent className="flex items-center justify-between text-sm text-zinc-400"><span>Completed tasks</span><RefreshCcw className="h-4 w-4 text-emerald-300" /></CardContent></Card>
-        <Card><CardHeader className="pb-3"><CardDescription>Failed jobs</CardDescription><CardTitle>{failedJobs}</CardTitle></CardHeader><CardContent className="flex items-center justify-between text-sm text-zinc-400"><span>Retry candidates</span><Database className="h-4 w-4 text-rose-300" /></CardContent></Card>
-      </div>
+      {error && (
+        <div className="rounded-lg border border-rose-500/20 bg-rose-950/10 px-4 py-3 text-xs font-mono text-rose-300">
+          [CRITICAL ERROR]: {error}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div> : null}
-    </>
+function PlusIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+    </svg>
   );
 }

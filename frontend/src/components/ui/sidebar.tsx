@@ -48,8 +48,8 @@ export function Sidebar({ className, children, ...props }: React.HTMLAttributes<
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex h-screen w-72 flex-col border-r border-white/10 bg-[#07111a] text-zinc-100 transition-transform duration-300 lg:static lg:z-auto lg:rounded-[28px] lg:border lg:bg-white/5 lg:backdrop-blur",
-        open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 flex h-screen w-72 flex-col border-r border-border bg-card text-foreground transition-transform duration-300 lg:translate-x-0",
+        open ? "translate-x-0" : "-translate-x-full",
         className
       )}
       {...props}

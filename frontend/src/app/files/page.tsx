@@ -143,63 +143,65 @@ export default function FilesPage() {
         }}
       />
 
-      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="border-border bg-card">
+          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 pb-4 border-b border-border/40">
             <div>
-              <CardTitle>File library</CardTitle>
-              <CardDescription>Upload source files, inspect metadata, reindex replacements, or delete stale files.</CardDescription>
+              <CardTitle>File Library</CardTitle>
+              <CardDescription>Manage context boundaries for vector retrieval.</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => void loadFiles()}>
-                <RefreshCcw className="h-4 w-4" />
+              <Button variant="secondary" className="border border-border text-xs font-mono uppercase bg-card text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-900" onClick={() => void loadFiles()}>
+                <RefreshCcw className="h-3.5 w-3.5" />
                 Refresh
               </Button>
-              <Button onClick={openUploadPicker} disabled={busyAction === "upload"}>
-                <ArrowUpFromLine className="h-4 w-4" />
-                {busyAction === "upload" ? "Uploading..." : "Upload file"}
+              <Button onClick={openUploadPicker} disabled={busyAction === "upload"} className="border border-foreground text-xs font-mono uppercase bg-foreground text-background hover:opacity-90">
+                <ArrowUpFromLine className="h-3.5 w-3.5" />
+                {busyAction === "upload" ? "Uploading..." : "Upload Context"}
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Language</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+              <TableHeader className="border-border hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Name</TableHead>
+                  <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Status</TableHead>
+                  <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Language</TableHead>
+                  <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Size</TableHead>
+                  <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Source</TableHead>
+                  <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {files.map((file) => (
-                  <TableRow key={file.id} className="group hover:bg-white/5">
+                  <TableRow key={file.id} className="group border-zinc-850 hover:bg-zinc-900/30">
                     <TableCell>
-                      <button onClick={() => setSelectedFileId(file.id)} className="text-left">
-                        <div className="font-medium text-white transition group-hover:text-cyan-200">{file.original_name}</div>
-                        <div className="text-xs text-zinc-500">{shortId(file.id)}</div>
+                      <button onClick={() => setSelectedFileId(file.id)} className="text-left outline-none">
+                        <div className="font-semibold text-foreground font-mono text-sm group-hover:underline">{file.original_name}</div>
+                        <div className="text-xs text-zinc-500 font-mono mt-0.5">{shortId(file.id)}</div>
                       </button>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={file.status === "ready" ? "success" : file.status === "failed" ? "destructive" : "secondary"}>{file.status}</Badge>
+                      <Badge variant={file.status === "ready" ? "success" : file.status === "failed" ? "destructive" : "secondary"} className="font-mono text-[10px] uppercase">
+                        {file.status}
+                      </Badge>
                     </TableCell>
-                    <TableCell>{file.language ?? "plain text"}</TableCell>
-                    <TableCell>{formatBytes(file.size_bytes)}</TableCell>
-                    <TableCell>{file.session_id ? shortId(file.session_id) : "global"}</TableCell>
+                    <TableCell className="font-mono text-xs text-zinc-500">{file.language ?? "plain text"}</TableCell>
+                    <TableCell className="font-mono text-xs text-zinc-500">{formatBytes(file.size_bytes)}</TableCell>
+                    <TableCell className="font-mono text-xs text-zinc-500">{file.session_id ? shortId(file.session_id) : "global"}</TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedFileId(file.id)}>
-                          <Search className="h-4 w-4" />
+                        <Button variant="ghost" className="border border-transparent text-xs font-mono uppercase text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900" size="sm" onClick={() => setSelectedFileId(file.id)}>
+                          <Search className="h-3.5 w-3.5" />
                           Details
                         </Button>
-                        <Button variant="secondary" size="sm" onClick={() => openReindexPicker(file.id)} disabled={busyAction === "reindex"}>
-                          <RefreshCcw className="h-4 w-4" />
+                        <Button variant="secondary" className="border border-border text-xs font-mono uppercase bg-card text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900" size="sm" onClick={() => openReindexPicker(file.id)} disabled={busyAction === "reindex"}>
+                          <RefreshCcw className="h-3.5 w-3.5" />
                           Reindex
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => void handleDelete(file.id)} disabled={busyAction === "delete"}>
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="destructive" className="border border-rose-500/20 text-xs font-mono uppercase bg-rose-500/5 text-rose-400 hover:bg-rose-500/10" size="sm" onClick={() => void handleDelete(file.id)} disabled={busyAction === "delete"}>
+                          <Trash2 className="h-3.5 w-3.5" />
                           Delete
                         </Button>
                       </div>
@@ -208,51 +210,51 @@ export default function FilesPage() {
                 ))}
               </TableBody>
             </Table>
-            {!files.length ? <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-black/10 p-6 text-sm text-zinc-500">No files uploaded yet.</div> : null}
+            {!files.length && <div className="mt-4 rounded-xl border border-dashed border-border p-6 text-center text-xs font-mono text-zinc-500">NO CONTEXT FILES UPLOADED YET.</div>}
           </CardContent>
         </Card>
 
-        <div className="space-y-5">
-          <Card>
-            <CardHeader>
-              <CardTitle>Workflow</CardTitle>
-              <CardDescription>Pick a file to open details, replace its source, or remove it entirely.</CardDescription>
+        <div className="space-y-6">
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-4 border-b border-border/40">
+              <CardTitle>RAG Telemetry Guide</CardTitle>
+              <CardDescription>How the pgvector indexing engine runs.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm text-zinc-300">
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Upload</div>
-                <div className="mt-1">Add a new source file and let the backend chunk and embed it.</div>
+            <CardContent className="space-y-3 text-xs font-mono text-zinc-500 pt-6">
+              <div className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 px-4 py-3">
+                <div className="font-semibold text-foreground uppercase tracking-wider text-[10px] mb-1">Index Chunking</div>
+                <div>Documents are parsed into syntactic, language-aware chunks for vector matching.</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Reindex</div>
-                <div className="mt-1">Choose a replacement file to refresh the stored chunks and embeddings.</div>
+              <div className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 px-4 py-3">
+                <div className="font-semibold text-foreground uppercase tracking-wider text-[10px] mb-1">Reindexing</div>
+                <div>Refreshing files triggers a background deletion of old vector rows and regenerates dense embeddings.</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Delete</div>
-                <div className="mt-1">Remove stale or incorrect files from the index and storage.</div>
+              <div className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 px-4 py-3">
+                <div className="font-semibold text-foreground uppercase tracking-wider text-[10px] mb-1">Durable Purge</div>
+                <div>Deletions run cascades that completely wipe file_chunks, embeddings, and response references.</div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>File summary</CardTitle>
-              <CardDescription>Quick snapshot of the current library.</CardDescription>
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-4 border-b border-border/40">
+              <CardTitle>Context Balance</CardTitle>
+              <CardDescription>Overall counts and validation quotas.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Total files</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{files.length}</div>
+            <CardContent className="grid gap-3 grid-cols-2 pt-6">
+              <div className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 px-4 py-3">
+                <div className="text-[9px] uppercase tracking-wider text-zinc-500 font-mono">Total Files</div>
+                <div className="mt-1 text-xl font-bold font-mono text-foreground">{files.length}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Ready files</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{files.filter((file) => file.status === "ready").length}</div>
+              <div className="rounded-lg border border-border bg-zinc-50 dark:bg-zinc-900/30 px-4 py-3">
+                <div className="text-[9px] uppercase tracking-wider text-zinc-500 font-mono">Ready Index</div>
+                <div className="mt-1 text-xl font-bold font-mono text-foreground">{files.filter((file) => file.status === "ready").length}</div>
               </div>
             </CardContent>
           </Card>
 
-          {status ? <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{status}</div> : null}
-          {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div> : null}
+          {status && <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-xs font-mono text-emerald-400">{status}</div>}
+          {error && <div className="rounded-lg border border-rose-500/20 bg-rose-950/10 px-4 py-3 text-xs font-mono text-rose-300">[ERROR]: {error}</div>}
         </div>
       </div>
 

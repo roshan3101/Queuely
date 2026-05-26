@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, FolderUp, KanbanSquare, PlusCircle, ShieldCheck, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderUp, KanbanSquare, PlusCircle, ShieldCheck, LogOut, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +20,7 @@ const navItems = [
   { href: "/tasks/new", label: "Add task", icon: PlusCircle },
   { href: "/jobs", label: "Jobs", icon: KanbanSquare },
   { href: "/files", label: "Files", icon: FolderUp },
+  { href: "/sessions", label: "AI Sessions", icon: MessageSquare },
   { href: "/ops", label: "Ops", icon: ShieldCheck },
 ];
 
@@ -28,16 +29,16 @@ export function AppShell({ title, subtitle, onSignOut }: { title: string; subtit
   const router = useRouter();
 
   return (
-    <Sidebar>
+    <Sidebar className="border-r border-border bg-card">
       <SidebarHeader>
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300/80">Queuely</div>
-          <div className="mt-2 text-2xl font-semibold text-white">{title}</div>
-          <p className="mt-1 text-sm text-zinc-400">{subtitle}</p>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">Queuely Platform</div>
+          <div className="mt-1.5 text-xl font-bold font-mono tracking-tight uppercase text-foreground">{title}</div>
+          <p className="mt-1 text-xs text-zinc-500 font-mono leading-normal">{subtitle}</p>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <nav className="mt-1 flex flex-1 flex-col gap-2 overflow-hidden">
+        <nav className="mt-3 flex flex-1 flex-col gap-1.5 overflow-hidden">
           <SidebarMenu>
             {navItems.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -48,10 +49,10 @@ export function AppShell({ title, subtitle, onSignOut }: { title: string; subtit
                     <Link
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition",
+                        "flex items-center gap-3 rounded-lg border px-4 py-2.5 text-xs font-mono uppercase tracking-wider transition",
                         active
-                          ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-100"
-                          : "border-white/10 bg-black/10 text-zinc-300 hover:bg-white/5"
+                          ? "border-foreground bg-zinc-100 dark:bg-zinc-900 text-foreground font-bold"
+                          : "border-transparent text-zinc-500 hover:text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -64,10 +65,23 @@ export function AppShell({ title, subtitle, onSignOut }: { title: string; subtit
           </SidebarMenu>
         </nav>
       </SidebarContent>
-      <SidebarFooter className="mt-auto">
+      <SidebarFooter className="mt-auto flex flex-col gap-2">
         <Button
           variant="secondary"
-          className="justify-start"
+          className="justify-start border border-border bg-card text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900"
+          onClick={() => {
+            const isDark = document.documentElement.classList.toggle("dark");
+            localStorage.setItem("theme", isDark ? "dark" : "light");
+          }}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+          </svg>
+          Toggle Theme
+        </Button>
+        <Button
+          variant="secondary"
+          className="justify-start border border-border bg-card text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900"
           onClick={() => {
             onSignOut?.();
             router.replace("/login");
