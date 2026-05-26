@@ -32,7 +32,7 @@ export function AppShell({ children, title, subtitle, onSignOut }: { children: R
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <div className="min-h-screen bg-[#02060b] text-zinc-100">
+      <div className="min-h-screen overflow-x-hidden bg-[#02060b] text-zinc-100">
         <div className="mx-auto flex min-h-screen w-full max-w-400 gap-5 p-4 lg:p-6">
           <Sidebar>
             <SidebarHeader>
@@ -43,7 +43,7 @@ export function AppShell({ children, title, subtitle, onSignOut }: { children: R
               </div>
             </SidebarHeader>
             <SidebarContent>
-              <nav className="mt-1 flex flex-1 flex-col gap-2">
+              <nav className="mt-1 flex flex-1 flex-col gap-2 overflow-hidden">
                 <SidebarMenu>
                   {navItems.map((item) => {
                     const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -70,7 +70,7 @@ export function AppShell({ children, title, subtitle, onSignOut }: { children: R
                 </SidebarMenu>
               </nav>
             </SidebarContent>
-            <SidebarFooter>
+            <SidebarFooter className="mt-auto">
               <Button
                 variant="secondary"
                 className="justify-start"
