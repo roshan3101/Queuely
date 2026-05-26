@@ -8,7 +8,7 @@ function Tabs({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
 }
 
 function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("inline-flex h-11 items-center rounded-xl border border-white/10 bg-black/20 p-1 text-zinc-300", className)} {...props} />;
+  return <div className={cn("inline-flex h-11 items-center rounded-xl border border-border bg-zinc-50 p-1 text-foreground dark:bg-zinc-900/30", className)} {...props} />;
 }
 
 function TabsTrigger({ className, active, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {

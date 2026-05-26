@@ -48,7 +48,7 @@ export function Sidebar({ className, children, ...props }: React.HTMLAttributes<
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex h-screen w-72 flex-col border-r border-border bg-card text-foreground transition-transform duration-300 lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 flex h-screen w-72 flex-col border-r border-border bg-card text-foreground shadow-sm transition-transform duration-300 lg:translate-x-0",
         open ? "translate-x-0" : "-translate-x-full",
         className
       )}
@@ -60,7 +60,7 @@ export function Sidebar({ className, children, ...props }: React.HTMLAttributes<
 }
 
 export function SidebarHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-4", className)} {...props} />;
+  return <div className={cn("border-b border-border p-4", className)} {...props} />;
 }
 
 export function SidebarContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -68,7 +68,7 @@ export function SidebarContent({ className, ...props }: React.HTMLAttributes<HTM
 }
 
 export function SidebarFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-4", className)} {...props} />;
+  return <div className={cn("border-t border-border p-4", className)} {...props} />;
 }
 
 export function SidebarMenu({ className, ...props }: React.HTMLAttributes<HTMLUListElement>) {

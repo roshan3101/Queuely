@@ -29,9 +29,9 @@ export function AppShell({ title, subtitle, onSignOut }: { title: string; subtit
   const router = useRouter();
 
   return (
-    <Sidebar className="border-r border-border bg-card">
+    <Sidebar className="border-r border-border bg-card shadow-sm">
       <SidebarHeader>
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">Queuely Platform</div>
           <div className="mt-1.5 text-xl font-bold font-mono tracking-tight uppercase text-foreground">{title}</div>
           <p className="mt-1 text-xs text-zinc-500 font-mono leading-normal">{subtitle}</p>
@@ -51,7 +51,7 @@ export function AppShell({ title, subtitle, onSignOut }: { title: string; subtit
                       className={cn(
                         "flex items-center gap-3 rounded-lg border px-4 py-2.5 text-xs font-mono uppercase tracking-wider transition",
                         active
-                          ? "border-foreground bg-zinc-100 dark:bg-zinc-900 text-foreground font-bold"
+                          ? "border-foreground bg-zinc-100 text-foreground font-bold dark:bg-zinc-900"
                           : "border-transparent text-zinc-500 hover:text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
                       )}
                     >

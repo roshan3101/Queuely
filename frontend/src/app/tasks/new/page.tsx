@@ -210,21 +210,21 @@ export default function TaskLauncherPage() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-      <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
-        <CardHeader className="border-b border-zinc-800/60">
+      <Card className="border-border bg-card text-foreground shadow-sm">
+        <CardHeader className="border-b border-border/60">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="font-mono text-sm uppercase tracking-wider">Task Deployer Wizard</CardTitle>
-              <CardDescription className="text-zinc-500">Configure and execute containerized celery tasks.</CardDescription>
+              <CardDescription className="text-muted-foreground">Configure and execute containerized celery tasks.</CardDescription>
             </div>
-            <span className="font-mono text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded">
+            <span className="font-mono text-xs text-foreground bg-muted border border-border px-2.5 py-1 rounded">
               STEP {step} / 3
             </span>
           </div>
 
           {/* Progress Bar */}
-          <div className="mt-4 flex h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
-            <div className="bg-white transition-all duration-300" style={{ width: `${(step / 3) * 100}%` }} />
+          <div className="mt-4 flex h-1 w-full bg-muted rounded-full overflow-hidden">
+            <div className="bg-foreground transition-all duration-300" style={{ width: `${(step / 3) * 100}%` }} />
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -237,7 +237,7 @@ export default function TaskLauncherPage() {
                 <select
                   value={taskDraft.jobType}
                   onChange={(event) => setTaskDraft((current) => ({ ...current, jobType: event.target.value as JobType }))}
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm font-mono text-white outline-none focus:border-zinc-500"
+                  className="w-full rounded-lg border border-border bg-card px-3.5 py-2.5 text-sm font-mono text-foreground outline-none focus:border-foreground"
                 >
                   <option value="pdf_processing">PDF Processing & OCR Sandbox</option>
                   <option value="report_generation">Semantic LLM Report Engine</option>
@@ -247,16 +247,16 @@ export default function TaskLauncherPage() {
 
               <div className="space-y-2">
                 <Label className="font-mono text-xs uppercase tracking-wider text-zinc-400">Upload Context File (Optional)</Label>
-                <div className="rounded-lg border border-dashed border-zinc-800 bg-zinc-900/30 p-4 text-center">
+                <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4 text-center">
                   <Input
                     type="file"
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       if (file) void uploadTaskFile(file);
                     }}
-                    className="border-zinc-800 bg-zinc-900 cursor-pointer text-zinc-400"
+                    className="border-border bg-card cursor-pointer text-muted-foreground"
                   />
-                  <p className="mt-2 text-xs text-zinc-500 font-mono">
+                  <p className="mt-2 text-xs text-muted-foreground font-mono">
                     {uploadedArtifact ? `ACTIVE: ${uploadedArtifact.original_name}` : "DRAG FILES OR BROWSE LOCAL DIRECTORIES"}
                   </p>
                 </div>
@@ -284,25 +284,25 @@ export default function TaskLauncherPage() {
                       value={taskDraft.pdfPreviewChars}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, pdfPreviewChars: event.target.value }))}
                       inputMode="numeric"
-                      className="border-zinc-800 bg-zinc-900 font-mono text-sm"
+                      className="border-border bg-card font-mono text-sm text-foreground"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-2">
-                    <label className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 text-xs font-mono text-zinc-300 cursor-pointer select-none">
+                    <label className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 p-3.5 text-xs font-mono text-foreground cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={taskDraft.pdfEnableOcr}
                         onChange={(event) => setTaskDraft((current) => ({ ...current, pdfEnableOcr: event.target.checked }))}
-                        className="rounded border-zinc-800 accent-white"
+                        className="rounded border-border accent-foreground"
                       />
                       OCR FALLBACK
                     </label>
-                    <label className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 text-xs font-mono text-zinc-300 cursor-pointer select-none">
+                    <label className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 p-3.5 text-xs font-mono text-foreground cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={taskDraft.pdfEnableTables}
                         onChange={(event) => setTaskDraft((current) => ({ ...current, pdfEnableTables: event.target.checked }))}
-                        className="rounded border-zinc-800 accent-white"
+                        className="rounded border-border accent-foreground"
                       />
                       EXTRACT TABLES
                     </label>
@@ -318,7 +318,7 @@ export default function TaskLauncherPage() {
                       <select
                         value={taskDraft.reportFormat}
                         onChange={(event) => setTaskDraft((current) => ({ ...current, reportFormat: event.target.value as TaskDraft["reportFormat"] }))}
-                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-sm font-mono text-white outline-none"
+                        className="w-full rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-mono text-foreground outline-none"
                       >
                         <option value="json">JSON</option>
                         <option value="md">Markdown</option>
@@ -330,7 +330,7 @@ export default function TaskLauncherPage() {
                       <select
                         value={taskDraft.reportProvider}
                         onChange={(event) => setTaskDraft((current) => ({ ...current, reportProvider: event.target.value as TaskDraft["reportProvider"] }))}
-                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-sm font-mono text-white outline-none"
+                        className="w-full rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-mono text-foreground outline-none"
                       >
                         <option value="template">Template Built-in</option>
                         <option value="openai">OpenAI GPT-4</option>
@@ -343,7 +343,7 @@ export default function TaskLauncherPage() {
                     <Input
                       value={taskDraft.reportTitle}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, reportTitle: event.target.value }))}
-                      className="border-zinc-800 bg-zinc-900 text-sm"
+                      className="border-border bg-card text-sm text-foreground"
                     />
                   </div>
                   <div className="space-y-2">
@@ -352,7 +352,7 @@ export default function TaskLauncherPage() {
                       value={taskDraft.reportSections}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, reportSections: event.target.value }))}
                       rows={4}
-                      className="border-zinc-800 bg-zinc-900 text-xs font-mono"
+                      className="border-border bg-card text-xs font-mono text-foreground"
                       placeholder="Use paragraph blocks for sections"
                     />
                   </div>
@@ -367,6 +367,7 @@ export default function TaskLauncherPage() {
                       value={taskDraft.emailTo}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, emailTo: event.target.value }))}
                       className="border-zinc-800 bg-zinc-900 text-sm font-mono"
+                        className="border-border bg-card text-sm font-mono text-foreground"
                       placeholder="operator@queuely.internal"
                     />
                   </div>
@@ -376,6 +377,7 @@ export default function TaskLauncherPage() {
                       value={taskDraft.emailSubject}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, emailSubject: event.target.value }))}
                       className="border-zinc-800 bg-zinc-900 text-sm"
+                                          className="border-border bg-card text-sm text-foreground"
                     />
                   </div>
                   <div className="space-y-2">
@@ -385,31 +387,32 @@ export default function TaskLauncherPage() {
                       onChange={(event) => setTaskDraft((current) => ({ ...current, emailBody: event.target.value }))}
                       rows={3}
                       className="border-zinc-800 bg-zinc-900 text-xs font-mono"
+                                          className="border-border bg-card text-xs font-mono text-foreground"
                     />
                   </div>
-                  <label className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3.5 text-xs font-mono text-zinc-300 cursor-pointer select-none">
+                  <label className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 p-3.5 text-xs font-mono text-foreground cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={taskDraft.emailDryRun}
                       onChange={(event) => setTaskDraft((current) => ({ ...current, emailDryRun: event.target.checked }))}
-                      className="rounded border-zinc-800 accent-white"
+                      className="rounded border-border accent-foreground"
                     />
                     FORCE DRY-RUN SMTP METRIC MOCK
                   </label>
                 </div>
               )}
 
-              <div className="flex justify-between pt-4 border-t border-zinc-800/60">
+              <div className="flex justify-between pt-4 border-t border-border/60">
                 <Button
                   onClick={() => setStep(1)}
                   variant="outline"
-                  className="font-mono text-xs uppercase tracking-wider border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+                  className="font-mono text-xs uppercase tracking-wider border-border text-muted-foreground hover:bg-muted"
                 >
                   <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
                 </Button>
                 <Button
                   onClick={() => setStep(3)}
-                  className="font-mono text-xs uppercase tracking-wider bg-white text-black hover:bg-zinc-200"
+                  className="font-mono text-xs uppercase tracking-wider bg-foreground text-background hover:bg-foreground/90"
                 >
                   Review Settings <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </Button>
@@ -426,7 +429,7 @@ export default function TaskLauncherPage() {
                   <select
                     value={taskDraft.priority}
                     onChange={(event) => setTaskDraft((current) => ({ ...current, priority: Number(event.target.value) }))}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-sm font-mono text-white outline-none"
+                    className="w-full rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-mono text-foreground outline-none"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((p) => (
                       <option key={p} value={p}>{p} {p === 5 ? "(Normal)" : p > 5 ? "(High)" : "(Low)"}</option>
@@ -439,33 +442,33 @@ export default function TaskLauncherPage() {
                     type="number"
                     value={taskDraft.maxRetries}
                     onChange={(event) => setTaskDraft((current) => ({ ...current, maxRetries: Number(event.target.value) || 3 }))}
-                    className="border-zinc-800 bg-zinc-900 font-mono text-sm"
+                    className="border-border bg-card font-mono text-sm text-foreground"
                   />
                 </div>
               </div>
 
               {/* JSON payload compiler overview */}
               <div className="space-y-2">
-                <div className="flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-zinc-500">
+                <div className="flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   <Terminal className="h-3.5 w-3.5" /> Payload JSON Compilation
                 </div>
-                <pre className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-[10px] font-mono leading-relaxed text-zinc-400">
+                <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-4 text-[10px] font-mono leading-relaxed text-muted-foreground">
                   {JSON.stringify(payloadPreview, null, 2)}
                 </pre>
               </div>
 
-              <div className="flex justify-between pt-4 border-t border-zinc-800/60">
+              <div className="flex justify-between pt-4 border-t border-border/60">
                 <Button
                   onClick={() => setStep(2)}
                   variant="outline"
-                  className="font-mono text-xs uppercase tracking-wider border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+                  className="font-mono text-xs uppercase tracking-wider border-border text-muted-foreground hover:bg-muted"
                 >
                   <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
                 </Button>
                 <Button
                   onClick={() => void submitTask()}
                   disabled={busy}
-                  className="font-mono text-xs uppercase tracking-wider bg-white text-black hover:bg-zinc-200"
+                  className="font-mono text-xs uppercase tracking-wider bg-foreground text-background hover:bg-foreground/90"
                 >
                   {busy ? "Deploying..." : "Deploy Blueprint Task"}
                 </Button>
@@ -478,55 +481,55 @@ export default function TaskLauncherPage() {
 
       {/* SIDE TIMELINES */}
       <div className="space-y-6">
-        <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
-          <CardHeader className="pb-3 border-b border-zinc-800/60">
-            <CardTitle className="font-mono text-xs uppercase tracking-wider text-zinc-400">Result Console</CardTitle>
-            <CardDescription className="text-zinc-500">Output verification from Celery containers.</CardDescription>
+        <Card className="border-border bg-card text-foreground shadow-sm">
+          <CardHeader className="pb-3 border-b border-border/60">
+            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Result Console</CardTitle>
+            <CardDescription className="text-muted-foreground">Output verification from Celery containers.</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-4">
             {latestResultJob ? (
               <>
                 <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider border-zinc-800 text-zinc-300">
+                  <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider border-border text-foreground">
                     {latestResultJob.job_type}
                   </Badge>
-                  <span className="font-mono text-[10px] text-zinc-500">{latestResultJob.id.slice(0, 8)}</span>
+                  <span className="font-mono text-[10px] text-muted-foreground">{latestResultJob.id.slice(0, 8)}</span>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-xs font-mono leading-relaxed text-zinc-300 max-h-48 overflow-y-auto">
+                <div className="rounded-lg border border-border bg-muted/40 p-4 text-xs font-mono leading-relaxed text-foreground max-h-48 overflow-y-auto">
                   {latestResultJob.result ? (
                     <pre>{JSON.stringify(latestResultJob.result, null, 2)}</pre>
                   ) : (
-                    <span className="text-zinc-600">[WAITING FOR ASYNC RESULT STREAM...]</span>
+                    <span className="text-muted-foreground">[WAITING FOR ASYNC RESULT STREAM...]</span>
                   )}
                 </div>
               </>
             ) : (
-              <div className="rounded-lg border border-dashed border-zinc-800 p-8 text-center text-xs font-mono text-zinc-600">
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs font-mono text-muted-foreground">
                 DEPLOY A BLUEPRINT TASK TO SEE ACTIVE STDOUT/STDERR.
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
-          <CardHeader className="pb-3 border-b border-zinc-800/60">
-            <CardTitle className="font-mono text-xs uppercase tracking-wider text-zinc-400">Deploy Pipeline History</CardTitle>
-            <CardDescription className="text-zinc-500">Auditable state log of your recent task runs.</CardDescription>
+        <Card className="border-border bg-card text-foreground shadow-sm">
+          <CardHeader className="pb-3 border-b border-border/60">
+            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Deploy Pipeline History</CardTitle>
+            <CardDescription className="text-muted-foreground">Auditable state log of your recent task runs.</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             {recentJobs.map((job) => (
-              <div key={job.id} className="rounded-lg border border-zinc-850 bg-zinc-900/10 p-3.5">
+              <div key={job.id} className="rounded-lg border border-border bg-muted/30 p-3.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white font-mono text-sm">{job.job_type}</span>
-                  <span className="font-mono text-[10px] border border-zinc-800 px-2 py-0.5 rounded uppercase tracking-wider text-zinc-400 bg-zinc-950">
+                  <span className="font-semibold text-foreground font-mono text-sm">{job.job_type}</span>
+                  <span className="font-mono text-[10px] border border-border px-2 py-0.5 rounded uppercase tracking-wider text-muted-foreground bg-card">
                     {job.status}
                   </span>
                 </div>
-                <div className="mt-1 text-[10px] font-mono text-zinc-500">UUID: {job.id.slice(0, 8)}</div>
+                <div className="mt-1 text-[10px] font-mono text-muted-foreground">UUID: {job.id.slice(0, 8)}</div>
               </div>
             ))}
             {!recentJobs.length ? (
-              <div className="rounded-lg border border-dashed border-zinc-800 p-8 text-center text-xs font-mono text-zinc-600">
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs font-mono text-muted-foreground">
                 NO HISTORY REPORTED.
               </div>
             ) : null}

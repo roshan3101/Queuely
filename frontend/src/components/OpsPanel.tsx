@@ -5,7 +5,7 @@ import { shortId } from "../lib/uiHelpers";
 
 export default function OpsPanel({ queues, workers, deadLetters, opsJobs, requeueJob, loadJobDetail, opsJobsOffset, prevOpsPage, nextOpsPage, opsBusy }: any) {
   return (
-    <aside className="rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur">
+    <aside className="rounded-[28px] border border-border bg-card p-4 shadow-sm backdrop-blur">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.24em] text-zinc-300">Operations</h2>
@@ -14,14 +14,14 @@ export default function OpsPanel({ queues, workers, deadLetters, opsJobs, requeu
       </div>
 
       <div className="mt-4 space-y-4">
-        <section className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+        <section className="rounded-[22px] border border-border bg-zinc-50 p-4 shadow-sm dark:bg-zinc-900/30">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Queue depths</h3>
             <span className="text-xs text-zinc-500">{queues.length} queues</span>
           </div>
           <div className="mt-3 space-y-2">
             {queues.map((queue:any) => (
-              <div key={queue.name} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              <div key={queue.name} className="rounded-xl border border-border bg-card px-3 py-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-zinc-200">{queue.name}</span>
                   <span className="font-mono text-cyan-200">{queue.depth}</span>
@@ -35,14 +35,14 @@ export default function OpsPanel({ queues, workers, deadLetters, opsJobs, requeu
           </div>
         </section>
 
-        <section className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+        <section className="rounded-[22px] border border-border bg-zinc-50 p-4 shadow-sm dark:bg-zinc-900/30">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Workers</h3>
             <span className="text-xs text-zinc-500">{workers.length} tracked</span>
           </div>
           <div className="mt-3 max-h-56 space-y-2 overflow-auto pr-1">
             {workers.map((worker:any) => (
-              <div key={`${worker.worker_name}-${worker.process_id}`} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              <div key={`${worker.worker_name}-${worker.process_id}`} className="rounded-xl border border-border bg-card px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm text-white">{worker.worker_name}</span>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] ${worker.healthy ? "bg-emerald-400/15 text-emerald-200" : "bg-rose-400/15 text-rose-200"}`}>{worker.healthy ? "healthy" : "stale"}</span>
@@ -55,10 +55,10 @@ export default function OpsPanel({ queues, workers, deadLetters, opsJobs, requeu
           </div>
         </section>
 
-        <section className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+        <section className="rounded-[22px] border border-border bg-zinc-50 p-4 shadow-sm dark:bg-zinc-900/30">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Jobs</h3>
-            <button className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-semibold text-zinc-200 transition hover:bg-black/30">Refresh</button>
+            <button className="rounded-lg border border-border bg-zinc-50 px-2.5 py-1 text-[11px] font-semibold text-foreground transition hover:bg-zinc-100 dark:bg-zinc-900/30 dark:hover:bg-zinc-900/50">Refresh</button>
           </div>
           <div className="mt-3 max-h-72 space-y-2 overflow-auto pr-1">
             {opsJobs.map((job:any) => (
@@ -76,20 +76,20 @@ export default function OpsPanel({ queues, workers, deadLetters, opsJobs, requeu
           <div className="mt-2 flex items-center justify-between">
             <div className="text-xs text-zinc-400">Showing {opsJobs.length} jobs</div>
             <div className="flex gap-2">
-              <button onClick={()=>prevOpsPage()} disabled={opsJobsOffset<=0} className="rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-xs text-zinc-200">Prev</button>
-              <button onClick={()=>nextOpsPage()} className="rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-xs text-zinc-200">Next</button>
+              <button onClick={()=>prevOpsPage()} disabled={opsJobsOffset<=0} className="rounded-lg border border-border bg-zinc-50 px-2 py-1 text-xs text-foreground dark:bg-zinc-900/30">Prev</button>
+              <button onClick={()=>nextOpsPage()} className="rounded-lg border border-border bg-zinc-50 px-2 py-1 text-xs text-foreground dark:bg-zinc-900/30">Next</button>
             </div>
           </div>
         </section>
 
-        <section className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+        <section className="rounded-[22px] border border-border bg-zinc-50 p-4 shadow-sm dark:bg-zinc-900/30">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Dead letters</h3>
             <span className="text-xs text-zinc-500">{deadLetters.length} items</span>
           </div>
           <div className="mt-3 max-h-72 space-y-2 overflow-auto pr-1">
             {deadLetters.map((job:any) => (
-              <div key={job.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              <div key={job.id} className="rounded-xl border border-border bg-card px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm text-white">{job.job_type}</span>
                   <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">{job.status}</span>

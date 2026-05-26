@@ -13,17 +13,17 @@ import { useToast } from "@/components/ui/use-toast";
 
 function JobStatusBadge({ status }: { status: JobRecord["status"] }) {
   const mapping = {
-    pending: { label: "pending", icon: PlayCircle, className: "border-zinc-800 text-zinc-400 bg-zinc-900/50" },
-    queued: { label: "queued", icon: RotateCw, className: "border-zinc-750 text-zinc-300 animate-spin bg-zinc-900/50" },
-    running: { label: "running", icon: RotateCw, className: "border-white text-white animate-spin bg-zinc-900" },
+    pending: { label: "pending", icon: PlayCircle, className: "border-border text-muted-foreground bg-muted/40" },
+    queued: { label: "queued", icon: RotateCw, className: "border-border text-foreground animate-spin bg-muted/40" },
+    running: { label: "running", icon: RotateCw, className: "border-foreground text-foreground animate-spin bg-card" },
     succeeded: { label: "succeeded", icon: CheckCircle2, className: "border-emerald-500/20 text-emerald-400 bg-emerald-500/5" },
     failed: { label: "failed", icon: AlertTriangle, className: "border-rose-500/20 text-rose-400 bg-rose-500/5" },
     retrying: { label: "retrying", icon: RotateCw, className: "border-amber-500/20 text-amber-400 bg-amber-500/5 animate-pulse" },
     dead_lettered: { label: "dead lettered", icon: AlertCircle, className: "border-rose-500/30 text-rose-300 bg-rose-950/20" },
-    cancelled: { label: "cancelled", icon: XCircle, className: "border-zinc-850 text-zinc-500 bg-zinc-900/10" },
+    cancelled: { label: "cancelled", icon: XCircle, className: "border-border text-muted-foreground bg-muted/20" },
   };
 
-  const config = mapping[status as keyof typeof mapping] || { label: status, icon: PlayCircle, className: "border-zinc-800 text-zinc-400" };
+  const config = mapping[status as keyof typeof mapping] || { label: status, icon: PlayCircle, className: "border-border text-muted-foreground bg-card" };
   const Icon = config.icon;
 
   return (
@@ -103,35 +103,35 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <Card className="border-zinc-800 bg-zinc-950 text-zinc-50">
-        <CardHeader className="border-b border-zinc-800/60 pb-4">
+      <Card className="border-border bg-card text-foreground shadow-sm">
+        <CardHeader className="border-b border-border/60 pb-4">
           <CardTitle className="font-mono text-sm uppercase tracking-wider">Active Stream</CardTitle>
-          <CardDescription className="text-zinc-500">
+            <CardDescription className="text-muted-foreground">
             Real-time auditable task timeline powered by Postgres and Redis fanout.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
           <Table>
-            <TableHeader className="border-zinc-800 hover:bg-transparent">
-              <TableRow className="border-zinc-800 hover:bg-transparent">
-                <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Type</TableHead>
-                <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Status</TableHead>
-                <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Queue</TableHead>
-                <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Created</TableHead>
-                <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500">Payload Preview</TableHead>
-                <TableHead className="font-mono text-xs uppercase tracking-wider text-zinc-500 text-right">Actions</TableHead>
+            <TableHeader className="border-border hover:bg-transparent">
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Type</TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Queue</TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Created</TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Payload Preview</TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {jobs.map((job) => (
-                <TableRow key={job.id} className="border-zinc-850 hover:bg-zinc-900/30">
-                  <TableCell className="font-semibold text-white font-mono text-sm">{job.job_type}</TableCell>
+                <TableRow key={job.id} className="border-border hover:bg-muted/40">
+                  <TableCell className="font-semibold text-foreground font-mono text-sm">{job.job_type}</TableCell>
                   <TableCell>
                     <JobStatusBadge status={job.status} />
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-zinc-400">{job.queue_name}</TableCell>
-                  <TableCell className="text-xs text-zinc-400">{new Date(job.created_at).toLocaleString()}</TableCell>
-                  <TableCell className="max-w-[320px] truncate font-mono text-xs text-zinc-500">
+                  <TableCell className="font-mono text-xs text-muted-foreground">{job.queue_name}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{new Date(job.created_at).toLocaleString()}</TableCell>
+                  <TableCell className="max-w-[320px] truncate font-mono text-xs text-muted-foreground">
                     {JSON.stringify(job.payload)}
                   </TableCell>
                   <TableCell className="text-right">
@@ -139,12 +139,12 @@ export default function JobsPage() {
                       <button
                         onClick={() => void handleCancelJob(job.id)}
                         disabled={cancellingId === job.id}
-                        className="rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs font-mono uppercase tracking-wider text-zinc-400 transition hover:border-rose-500/40 hover:bg-rose-950/20 hover:text-rose-400 disabled:opacity-40"
+                        className="rounded border border-border bg-card px-2.5 py-1 text-xs font-mono uppercase tracking-wider text-foreground transition hover:border-rose-500/40 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/20 disabled:opacity-40"
                       >
                         {cancellingId === job.id ? "Cancelling..." : "Cancel"}
                       </button>
                     ) : (
-                      <span className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">Archive</span>
+                        <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">Archive</span>
                     )}
                   </TableCell>
                 </TableRow>
@@ -152,12 +152,12 @@ export default function JobsPage() {
             </TableBody>
           </Table>
           {!jobs.length ? (
-            <div className="mt-4 rounded-xl border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center text-sm font-mono text-zinc-600">
+            <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm font-mono text-muted-foreground">
               NO ACTIVE JOBS FOUND. SUBMIT A TASK WIZARD TO STREAM LIVE METRICS.
             </div>
           ) : null}
           {error ? (
-            <div className="mt-4 rounded-lg border border-rose-500/20 bg-rose-950/10 px-4 py-3 text-sm font-mono text-rose-200">
+            <div className="mt-4 rounded-lg border border-rose-500/20 bg-rose-50 px-4 py-3 text-sm font-mono text-rose-700 dark:bg-rose-950/10 dark:text-rose-200">
               [SYSTEM ERROR]: {error}
             </div>
           ) : null}

@@ -37,7 +37,7 @@ export default function JobLauncher({
   opsBusy: boolean;
 }) {
   return (
-    <section className="mt-6 rounded-[22px] border border-white/10 bg-black/20 p-4">
+    <section className="mt-6 rounded-[22px] border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-white">Launch job</h3>
@@ -46,7 +46,7 @@ export default function JobLauncher({
       </div>
 
       <div className="mt-3 space-y-3">
-        <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+        <label className="rounded-xl border border-border bg-zinc-50 px-3 py-2 dark:bg-zinc-900/30">
           <FieldLabel>Job type</FieldLabel>
           <select
             value={jobDraft.jobType}
@@ -61,7 +61,7 @@ export default function JobLauncher({
 
         {jobDraft.jobType === "pdf_processing" ? (
           <div className="space-y-3">
-            <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+            <label className="rounded-xl border border-border bg-zinc-50 px-3 py-2 dark:bg-zinc-900/30">
               <FieldLabel>PDF file path</FieldLabel>
               <input
                 value={jobDraft.pdfFilePath}
@@ -70,7 +70,7 @@ export default function JobLauncher({
                 placeholder="backend/storage/uploads/.../document.pdf"
               />
             </label>
-            <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+            <label className="rounded-xl border border-border bg-zinc-50 px-3 py-2 dark:bg-zinc-900/30">
               <FieldLabel>Preview chars</FieldLabel>
               <input
                 value={jobDraft.pdfPreviewChars}
@@ -80,7 +80,7 @@ export default function JobLauncher({
               />
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200">
+              <label className="flex items-center gap-2 rounded-xl border border-border bg-zinc-50 px-3 py-2 text-sm text-foreground dark:bg-zinc-900/30">
                 <input
                   type="checkbox"
                   checked={jobDraft.pdfEnableOcr}
@@ -88,7 +88,7 @@ export default function JobLauncher({
                 />
                 OCR fallback
               </label>
-              <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200">
+              <label className="flex items-center gap-2 rounded-xl border border-border bg-zinc-50 px-3 py-2 text-sm text-foreground dark:bg-zinc-900/30">
                 <input
                   type="checkbox"
                   checked={jobDraft.pdfEnableTables}
@@ -105,7 +105,7 @@ export default function JobLauncher({
 
         {jobDraft.jobType === "report_generation" ? (
           <div className="space-y-3">
-            <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+            <label className="rounded-xl border border-border bg-zinc-50 px-3 py-2 dark:bg-zinc-900/30">
               <FieldLabel>Title</FieldLabel>
               <input
                 value={jobDraft.reportTitle}
@@ -115,7 +115,7 @@ export default function JobLauncher({
               />
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+              <label className="rounded-xl border border-border bg-zinc-50 px-3 py-2 dark:bg-zinc-900/30">
                 <FieldLabel>Format</FieldLabel>
                 <select
                   value={jobDraft.reportFormat}
@@ -147,7 +147,7 @@ export default function JobLauncher({
                 </select>
               </label>
             </div>
-            <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+            <label className="rounded-xl border border-border bg-zinc-50 px-3 py-2 dark:bg-zinc-900/30">
               <FieldLabel>Provider model</FieldLabel>
               <input
                 value={jobDraft.reportProviderModel}
@@ -156,7 +156,7 @@ export default function JobLauncher({
                 placeholder="Optional override"
               />
             </label>
-            <label className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+            <label className="rounded-xl border border-border bg-zinc-50 px-3 py-2 dark:bg-zinc-900/30">
               <FieldLabel>Summary</FieldLabel>
               <textarea
                 value={jobDraft.reportSummary}
@@ -219,7 +219,7 @@ export default function JobLauncher({
                 placeholder="<p><strong>Status</strong> update</p>"
               />
             </label>
-            <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200">
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-zinc-50 px-3 py-2 text-sm text-foreground dark:bg-zinc-900/30">
               <input
                 type="checkbox"
                 checked={jobDraft.emailDryRun}
